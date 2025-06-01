@@ -1,0 +1,19 @@
+function main() -> void
+{
+	yield();
+	delegate();
+}
+
+function addressof(number const value) -> number*
+{
+	return &value;
+}
+
+function delegate() -> number
+{
+	number* ptr = addressof(1);
+	number const* cptr = ptr;
+	ptr = cptr;
+}
+
+Device device = dopen(2);
