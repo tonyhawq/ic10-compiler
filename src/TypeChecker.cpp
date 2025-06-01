@@ -49,9 +49,36 @@ bool TypeChecker::Operator::Overload::Type::matches(const TypeName& other) const
 	return this->type == other;
 }
 
-#define OPERATOR_OVERLOADING_RETURN_TYPE_GET_OR_MAKE_FAILURE_MODE(val) do { if (return_type.failed()) {\
+#define OPERATOR_OVERLOADING_RETURN_TYPE_GET_OR_MAKE_FAILURE_MODE(val) do { if (!return_type.failed()) {\
 	return_type = ReturnType(val);\
 } } while (0)
+
+static TypeName apply_transformation(const TypeName& to, const TypeName& transform)
+{
+	TypeName transformed = to;
+	int height = transform.height();
+	// 5 layer pointer
+	for (int i = 0; i < height; i++)
+	{
+		const TypeName* transformation_to_use = &transform;
+		// to get 1st layer (4 from top)
+		// iterate 4 times
+		for (int j = 0; j < height - i - 1; j++)
+		{
+			transformation_to_use = transformation_to_use->m_pointed_to_type.get();
+		}
+		bool constant = transformation_to_use->constant;
+		if (transformation_to_use->pointer)
+		{
+			transformed.make_pointer_type(constant);
+		}
+		else
+		{
+			transformed.constant = constant;
+		}
+	}
+	return transformed;
+}
 
 TypeName TypeChecker::Operator::Overload::return_type(const std::vector<TypeName>& args) const
 {
@@ -62,28 +89,16 @@ TypeName TypeChecker::Operator::Overload::return_type(const std::vector<TypeName
 			throw std::runtime_error("TYPECHECKER ERROR: !OPERATOR WHICH TRANSFORMS INPUT ARG CANNOT TRANSFORM > 1 or 0 ARGS!");
 		}
 		TypeName transformed = this->unannotated_return_type;
-		int height = this->transformation->height();
-		// 5 layer pointer
-		for (int i = 0; i < height; i++)
+		if (this->args.at(0).matches_underlying)
 		{
-			TypeName* transformation_to_use = this->transformation.get();
-			// to get 1st layer (4 from top)
-			// iterate 4 times
-			for (int j = 0; j < height - i; j++)
-			{
-				transformation_to_use = transformation_to_use->m_pointed_to_type.get();
-			}
-			bool constant = transformation_to_use->constant;
-			if (transformation_to_use->pointer)
-			{
-				transformed.make_pointer_type(constant);
-			}
-			else
-			{
-				transformed.constant = constant;
-			}
+			transformed = apply_transformation(transformed, args.at(0));
+		}
+		if (this->transformation)
+		{
+			transformed = apply_transformation(transformed, *this->transformation);
 		}
 		return transformed;
+		
 	}
 	return this->unannotated_return_type;
 }
@@ -128,7 +143,8 @@ TypeChecker::Operator::ReturnType TypeChecker::Operator::return_type(const std::
 		{
 			continue;
 		}
-		return ReturnType(overload.return_type(args));
+		TypeName typename_return_type = overload.return_type(args);
+		return ReturnType(typename_return_type);
 	}
 	if (!return_type.failed())
 	{
@@ -175,44 +191,62 @@ TypeChecker::TypeChecker(Compiler& compiler, std::vector<std::unique_ptr<Stmt>>&
 	this->types.emplace(t_boolean, TypeID{ t_boolean, false, nullptr, nullptr });
 	this->types.emplace(t_void, TypeID{ t_void, false, nullptr, nullptr });
 	
-	this->define_operator(TokenType::GREATER, "op_greater", { { t_boolean, { t_number, t_number } } });
-	this->define_operator(TokenType::GREATER_EQUAL, "op_greater_equal", { { t_boolean, { t_number, t_number } } });
-	this->define_operator(TokenType::LESS, "op_less", {{ t_boolean, { t_number, t_number } } });
-	this->define_operator(TokenType::LESS_EQUAL, "op_less_equal", { {t_boolean, { t_number, t_number } } });
-	this->define_operator(TokenType::PLUS, "op_plus", { {t_number, { t_number, t_number } } });
-	this->define_operator(TokenType::MINUS, "op_minus", { { t_number, { t_number, t_number } }, {t_number, {t_number}} }); // includes unary -
-	this->define_operator(TokenType::STAR, "op_star", { { t_number, { t_number, t_number } } });
-	this->define_operator(TokenType::SLASH, "op_div", { { t_number, { t_number, t_number } } });
-	this->define_operator(TokenType::EQUAL_EQUAL, "op_equality", { { t_boolean, { t_number, t_number }}, { t_boolean, { t_boolean, t_boolean } } });
-	this->define_operator(TokenType::BANG_EQUAL, "op_inverse_equality", { { t_boolean, { t_number, t_number } }, { t_boolean, { t_boolean, t_boolean } } });
-	this->define_operator(TokenType::BANG, "unary_not", { {t_boolean, {t_boolean} } });
+	this->define_operator(TokenType::GREATER, "op_greater", {
+		Operator::Overload{t_boolean, nullptr, {{t_number, false}, {t_number, false}}}
+		});
+	this->define_operator(TokenType::GREATER_EQUAL, "op_greater_equal", {
+		Operator::Overload{t_boolean, nullptr, {{t_number, false}, {t_number, false}}}
+		});
+	this->define_operator(TokenType::LESS, "op_less", {
+		Operator::Overload{t_boolean, nullptr, {{t_number, false}, {t_number, false}}}
+		});
+	this->define_operator(TokenType::LESS_EQUAL, "op_less_equal", {
+		Operator::Overload{t_boolean, nullptr, {{t_number, false}, {t_number, false}}}
+		});
+	this->define_operator(TokenType::PLUS, "op_plus", {
+		Operator::Overload{t_number, nullptr, {{t_number, false}, {t_number, false}}}
+		});
+	this->define_operator(TokenType::MINUS, "op_minus", {
+		Operator::Overload{t_number, nullptr, {{t_number, false}}},
+		Operator::Overload{t_number, nullptr, {{t_number, false}, {t_number, false}}}}
+		); // includes unary -
+	this->define_operator(TokenType::STAR, "op_star", {
+		Operator::Overload{t_number, nullptr, {{t_number, false}, {t_number, false}}}
+		});
+	this->define_operator(TokenType::SLASH, "op_div", {
+		Operator::Overload{t_number, nullptr, {{t_number, false}, {t_number, false}}}
+		});
+	this->define_operator(TokenType::EQUAL_EQUAL, "op_equality", {
+		Operator::Overload{t_boolean, nullptr, {{t_number, false}, {t_number, false}}},
+		Operator::Overload{t_boolean, nullptr, {{t_boolean, false}, {t_boolean, false}}}
+		});
+	this->define_operator(TokenType::BANG_EQUAL, "op_inverse_equality", {
+		Operator::Overload{t_boolean, nullptr, {{t_number, false}, {t_number, false}}},
+		Operator::Overload{t_boolean, nullptr, {{t_boolean, false}, {t_boolean, false}}}
+		});
+	this->define_operator(TokenType::BANG, "unary_not", {
+		Operator::Overload{t_number, nullptr, {{t_number, false}}},
+		});
+	TypeName t_number_ptr = t_number;
+	t_number_ptr.make_pointer_type(false);
+	this->define_operator(TokenType::AMPERSAND, "addressof", {
+		Operator::Overload{t_number, std::make_unique<TypeName>(t_number_ptr), {{t_number, true}}}
+		});
+	this->define_operator(TokenType::BAR, "deref", {
+		Operator::Overload{t_number, nullptr, {{t_number_ptr}}}
+		});
 
 	this->define_library_function("dopen", t_Device, { t_number });
 	this->define_library_function("yield", t_void, {});
 }
 
-void TypeChecker::define_operator(TokenType type, const std::string& name, const std::vector<>& types)
+void TypeChecker::define_operator(TokenType type, const std::string& name, std::vector<Operator::Overload> overloads)
 {
 	if (this->operator_types.count(type))
 	{
 		throw std::runtime_error("TYPECHECK ERROR: !ATTEMPTED TO CREATE EXISTENT OPERATOR!");
 	}
-	for (const auto& operator_type : types)
-	{
-		std::vector<TypeID::FunctionParam> params;
-		params.reserve(operator_type.arg_types.size());
-		for (const auto& arg_type : operator_type.arg_types)
-		{
-			params.push_back({ arg_type, "_" });
-		}
-		this->operator_types[type].push_back(TypeID{
-			this->get_function_signature(params, operator_type.return_type),
-			true,
-			std::make_unique<TypeName>(operator_type.return_type),
-			std::make_unique<std::string>(name),
-			std::make_unique<std::vector<TypeID::FunctionParam>>(std::move(params))
-		});
-	}
+	this->operator_types.emplace(type, std::move(Operator(name, std::move(overloads))));
 }
 
 void TypeChecker::define_library_function(const std::string& name, const TypeName& return_type, const std::vector<TypeName>& arg_types)
@@ -253,42 +287,21 @@ void* TypeChecker::visitExprBinary(Expr::Binary& expr)
 	std::unique_ptr<TypeName> right_type = this->accept(*expr.right);
 	if (!left_type || !right_type)
 	{
-		return new TypeName(this->operator_types.at(expr.op.type).begin()->return_type());
+		return nullptr;
 	}
 	if (left_type != right_type)
 	{
 		this->error(expr.op, "Attempted to perform an operation on two dissimilar types.");
 		return nullptr;
 	}
-	std::vector<std::string> overload_failures;
-	for (const auto& op : this->operator_types.at(expr.op.type))
+	Operator& op = this->operator_types.at(expr.op.type);
+	Operator::ReturnType returned = op.return_type({ *left_type, *right_type });
+	if (returned.failed())
 	{
-		if (op.arguments().size() != 2)
-		{
-			overload_failures.push_back(std::string("Operator ") + op.unmangled_name() + " could not match (requires " + std::to_string(op.arguments().size()) + " arguments)");
-			continue;
-		}
-		if (*left_type != op.arguments().at(0).type)
-		{
-			overload_failures.push_back(std::string("Operator ") + op.unmangled_name() + " could not match left type " + left_type->type_name());
-			continue;
-		}
-		if (*right_type != op.arguments().at(1).type)
-		{
-			overload_failures.push_back(std::string("Operator ") + op.unmangled_name() + " could not match right type " + right_type->type_name());
-			continue;
-		}
-		return new TypeName(op.return_type());
+		this->error(expr.op, returned.failure());
+		return nullptr;
 	}
-	std::string error_msg = "Could find matching overload for operator:\n";
-	for (const auto& failure : overload_failures)
-	{
-		error_msg += "  - ";
-		error_msg += failure;
-		error_msg += '\n';
-	}
-	this->error(expr.op, error_msg);
-	return nullptr;
+	return std::make_unique<TypeName>(returned.type()).release();
 }
 
 void* TypeChecker::visitExprGrouping(Expr::Grouping& expr)
@@ -326,30 +339,14 @@ void* TypeChecker::visitExprUnary(Expr::Unary& expr)
 		return nullptr;
 	}
 	Operator& op = this->operator_types.at(expr.op.type);
-	std::vector<std::string> overload_failures;
-	for (const auto& op : operators)
+	Operator::ReturnType returned = op.return_type({ *type });
+	if (returned.failed())
 	{
-		if (op.arguments().size() != 1)
-		{
-			overload_failures.push_back(std::string("Operator ") + op.unmangled_name() + " could not match (requires " + std::to_string(op.arguments().size()) + " arguments)");
-			continue;
-		}
-		if (op.arguments().at(0).type != *type)
-		{
-			overload_failures.push_back(std::string("Operator ") + op.unmangled_name() + " could not match type " + type->type_name()); 
-			continue;
-		}
-		return new TypeName(op.return_type());
+		this->error(expr.op, returned.failure());
+		return nullptr;
 	}
-	std::string error_msg = "Could find matching overload for operator:\n";
-	for (const auto& failure : overload_failures)
-	{
-		error_msg += "  - ";
-		error_msg += failure;
-		error_msg += '\n';
-	}
-	this->error(expr.op, error_msg);
-	return nullptr;
+	const TypeName& return_type = returned.type();
+	return std::make_unique<TypeName>(return_type).release();
 }
 
 void* TypeChecker::visitExprVariable(Expr::Variable& expr)

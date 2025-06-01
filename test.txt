@@ -1,19 +1,11 @@
-function main() -> void
+
+function addressof(number value) -> number**
 {
-	yield();
-	delegate();
+	number* pval = &value;
+	return ppval;
 }
 
-function addressof(number const value) -> number*
+function deref(number** value) -> number*
 {
-	return &value;
+	return |value;
 }
-
-function delegate() -> number
-{
-	number* ptr = addressof(1);
-	number const* cptr = ptr;
-	ptr = cptr;
-}
-
-Device device = dopen(2);
