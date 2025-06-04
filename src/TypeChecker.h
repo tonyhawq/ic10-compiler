@@ -41,59 +41,7 @@ public:
 		TypeChecking,
 	};
 	
-	struct Operator
-	{
-		struct Overload
-		{
-			struct Type
-			{
-				bool matches(const TypeName& other) const;
-
-				TypeName type;
-				bool matches_underlying;
-			};
-			Overload(TypeName unannotated_return_type, std::unique_ptr<TypeName> transformation, const std::vector<Type>& args) :
-				unannotated_return_type(unannotated_return_type),
-				transformation(std::move(transformation)),
-				args(args)
-			{};
-			Overload(const Overload& other) :
-				unannotated_return_type(other.unannotated_return_type),
-				transformation(other.transformation ? std::make_unique<TypeName>(*other.transformation) : nullptr),
-				args(other.args)
-			{};
-			Overload(Overload&& other) noexcept = default;
-
-			TypeName return_type(const std::vector<TypeName>& args) const;
-			TypeName unannotated_return_type;
-			std::unique_ptr<TypeName> transformation;
-			std::vector<Type> args;
-		};
-		
-		class ReturnType
-		{
-		public:
-			ReturnType(std::string failure) : failure_mode(std::make_unique<std::string>(std::move(failure))), m_type(nullptr) {};
-			ReturnType(const TypeName& type) : failure_mode(nullptr), m_type(std::make_unique<TypeName>(type)) {};
-			
-			explicit ReturnType() : failure_mode(nullptr), m_type(nullptr) {};
-
-			bool failed() const;
-			std::string& failure();
-			const std::string& failure() const;
-			const TypeName& type() const;
-		private:
-			std::unique_ptr<std::string> failure_mode;
-			std::unique_ptr<TypeName> m_type;
-		};
-
-		ReturnType return_type(const std::vector<TypeName>& args);
-		
-		Operator(const std::string& operator_name, std::vector<Overload> overloads) :operator_name(operator_name), overloads(std::move(overloads)) {};
-
-		std::string operator_name;
-		std::vector<Overload> overloads;
-	};
+	struct Operator;
 
 	TypeChecker(Compiler& compiler, std::vector<std::unique_ptr<Stmt>>& statements);
 	Environment* env;
@@ -108,8 +56,8 @@ public:
 	void evaluate(std::vector<std::unique_ptr<Stmt>>& statements);
 	void error(const Token& token, const std::string& message);
 
-	bool can_initalize(const TypeName& to, const TypeName& from);
-	bool can_assign(const TypeName& to, const TypeName& from);
+	static bool can_initalize(const TypeName& to, const TypeName& from);
+	static bool can_assign(const TypeName& to, const TypeName& from);
 
 	std::unique_ptr<TypeName> accept(Expr& expression);
 
@@ -137,4 +85,47 @@ private:
 	Pass current_pass;
 	std::vector<std::unique_ptr<Stmt>>& statements_to_typecheck;
 	Compiler& compiler;
+};
+
+struct TypeChecker::Operator
+{
+	class Overload;
+	class ReturnType;
+
+	ReturnType return_type(const std::vector<TypeName>& args);
+
+	Operator(const std::string& operator_name, std::vector<Overload> overloads) :operator_name(operator_name), overloads(std::move(overloads)) {};
+
+	std::string operator_name;
+	std::vector<std::unique_ptr<Overload>> overloads;
+};
+
+class TypeChecker::Operator::Overload
+{
+public:
+	class SimpleOverload;
+
+	Overload(const TypeName& return_type);
+	virtual ~Overload();
+	virtual ReturnType return_type(const std::vector<TypeName>& args) const;
+protected:
+	TypeName m_return_type;
+	std::vector<TypeName> arg_types;
+};
+
+class TypeChecker::Operator::ReturnType
+{
+public:
+	ReturnType(std::string failure) : failure_mode(std::make_unique<std::string>(std::move(failure))), m_type(nullptr) {};
+	ReturnType(const TypeName& type) : failure_mode(nullptr), m_type(std::make_unique<TypeName>(type)) {};
+
+	explicit ReturnType() : failure_mode(nullptr), m_type(nullptr) {};
+
+	bool failed() const;
+	std::string& failure();
+	const std::string& failure() const;
+	const TypeName& type() const;
+private:
+	std::unique_ptr<std::string> failure_mode;
+	std::unique_ptr<TypeName> m_type;
 };

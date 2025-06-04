@@ -40,15 +40,6 @@ const std::vector<TypeID::FunctionParam>& TypeID::arguments() const
 	return *this->m_arguments;
 }
 
-bool TypeChecker::Operator::Overload::Type::matches(const TypeName& other) const
-{
-	if (this->matches_underlying)
-	{
-		return this->type.underlying() == other.underlying();
-	}
-	return this->type == other;
-}
-
 #define OPERATOR_OVERLOADING_RETURN_TYPE_GET_OR_MAKE_FAILURE_MODE(val) do { if (!return_type.failed()) {\
 	return_type = ReturnType(val);\
 } } while (0)
@@ -80,27 +71,28 @@ static TypeName apply_transformation(const TypeName& to, const TypeName& transfo
 	return transformed;
 }
 
-TypeName TypeChecker::Operator::Overload::return_type(const std::vector<TypeName>& args) const
+TypeChecker::Operator::Overload::Overload(const TypeName& return_type) :m_return_type(return_type)
+{}
+
+TypeChecker::Operator::Overload::~Overload()
+{}
+
+TypeChecker::Operator::ReturnType TypeChecker::Operator::Overload::return_type(const std::vector<TypeName>& args) const
 {
-	if (this->transformation)
+	if (args.size() != this->arg_types.size())
 	{
-		if (args.size() != 1)
-		{
-			throw std::runtime_error("TYPECHECKER ERROR: !OPERATOR WHICH TRANSFORMS INPUT ARG CANNOT TRANSFORM > 1 or 0 ARGS!");
-		}
-		TypeName transformed = this->unannotated_return_type;
-		if (this->args.at(0).matches_underlying)
-		{
-			transformed = apply_transformation(transformed, args.at(0));
-		}
-		if (this->transformation)
-		{
-			transformed = apply_transformation(transformed, *this->transformation);
-		}
-		return transformed;
-		
+		return std::string("Requires ") + std::to_string(this->arg_types.size()) + " arguments, got " + std::to_string(args.size());
 	}
-	return this->unannotated_return_type;
+	for (int i = 0; i < this->arg_types.size(); i++)
+	{
+		const TypeName& arg = args[i];
+		const TypeName& param = this->arg_types[i];
+		if (!TypeChecker::can_assign(param, arg))
+		{
+			return std::string("Cannot assign argument ") + std::to_string(i + 1) + " of type " + arg.type_name() + " to " + param.type_name();
+		}
+	}
+	return this->m_return_type;
 }
 
 TypeChecker::Operator::ReturnType TypeChecker::Operator::return_type(const std::vector<TypeName>& args)
@@ -108,43 +100,16 @@ TypeChecker::Operator::ReturnType TypeChecker::Operator::return_type(const std::
 	ReturnType return_type = ReturnType();
 	for (const auto& overload : this->overloads)
 	{
-		if (overload.args.size() != args.size())
+		ReturnType overload_return_type = overload.return_type(args);
+		if (overload_return_type.failed())
 		{
 			OPERATOR_OVERLOADING_RETURN_TYPE_GET_OR_MAKE_FAILURE_MODE(std::string("Operator overloading failed for operator ") + this->operator_name);
-			std::string& failure = return_type.failure();
-			failure += "\n    -";
-			failure += " Requires ";
-			failure += std::to_string(overload.args.size());
-			failure += " arguments, got ";
-			failure += std::to_string(args.size());
-			continue;
+			return_type.failure() += overload_return_type.failure();
 		}
-		bool arg_resolution_failed = false;
-		for (int i = 0; i < overload.args.size(); i++)
+		else
 		{
-			const Overload::Type& overload_arg = overload.args[i];
-			const TypeName& arg = args[i];
-			if (!overload_arg.matches(arg))
-			{
-				arg_resolution_failed = true;
-				OPERATOR_OVERLOADING_RETURN_TYPE_GET_OR_MAKE_FAILURE_MODE(std::string("Operator overloading failed for operator ") + this->operator_name);
-				std::string& failure = return_type.failure();
-				failure += "\n    -";
-				failure += " Argument ";
-				failure += std::to_string(i);
-				failure += " is of type ";
-				failure += arg.type_name();
-				failure += " while wanted type is ";
-				failure += overload_arg.type.type_name();
-				continue;
-			}
+			return overload_return_type;
 		}
-		if (arg_resolution_failed)
-		{
-			continue;
-		}
-		TypeName typename_return_type = overload.return_type(args);
-		return ReturnType(typename_return_type);
 	}
 	if (!return_type.failed())
 	{
