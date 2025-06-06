@@ -660,6 +660,18 @@ void* TypeChecker::visitStmtFunction(Stmt::Function& expr)
 {
 	if (this->current_pass == Pass::Linking)
 	{
+		if (expr.name.lexeme == "main")
+		{
+			// main function
+			if (expr.params.size())
+			{
+				this->error(expr.name, "Entry point (main) cannot have any arguments.");
+			}
+			if (expr.return_type != TypeName("void"))
+			{
+				this->error(expr.name, "Entry point (main) must return void.");
+			}
+		}
 		std::vector<TypeID::FunctionParam> args;
 		for (const auto& param : expr.params)
 		{

@@ -17,6 +17,7 @@ enum class TokenType
 	STAR,
 	AMPERSAND,
 	HASH,
+	QUESTION,
 	BAR,
 
 	BANG,
@@ -34,7 +35,7 @@ enum class TokenType
 	STRING,
 	HASHED_STRING,
 
-	QUESTION,
+	NODISCARD,
 	CONST,
 	AND,
 	OR,

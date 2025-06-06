@@ -1,8 +1,9 @@
 
+number global = 0;
+
 function foo() -> const number
 {
-	const number*? value = &0;
-	return 0 + 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9;
+	return global + 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9;
 }
 
 function bar() -> const string*
@@ -10,7 +11,8 @@ function bar() -> const string*
 	return &"hello";
 }
 
-function main() -> string
+function main() -> void
 {
-	return |bar();
+	bar();
+	return;
 }

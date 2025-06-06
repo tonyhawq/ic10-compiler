@@ -23,6 +23,7 @@ std::unordered_map<std::string, TokenType> Scanner::keywords = {
 	{"print", TokenType::PRINT},
 	{"struct", TokenType::STRUCT},
 	{"const", TokenType::CONST},
+	{"nodiscard", TokenType::NODISCARD}
 };
 
 Scanner::Scanner(Compiler& compiler, const std::string& in)

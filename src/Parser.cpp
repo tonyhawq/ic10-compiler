@@ -164,6 +164,11 @@ std::unique_ptr<Stmt> Parser::parse_function_declaration()
 		} while (this->match({ TokenType::COMMA }));
 	}
 	this->consume(TokenType::RIGHT_PAREN, "Expected ) following function name and arguments.");
+	bool attribute_nodiscard = false;
+	if (this->match({ TokenType::NODISCARD }))
+	{
+		attribute_nodiscard = true;
+	}
 	this->consume(TokenType::ARROW, "Expected -> to denote return type following function name and arguments.");
 	TypeName return_type = this->parse_type();
 	consume(TokenType::LEFT_BRACE, "Expected { before function body.");
