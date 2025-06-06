@@ -276,6 +276,7 @@ void* TypeChecker::visitExprBinary(Expr::Binary& expr)
 		this->error(expr.op, returned.failure());
 		return nullptr;
 	}
+	expr.type = returned.type();
 	return std::make_unique<TypeName>(returned.type()).release();
 }
 
@@ -285,22 +286,30 @@ void* TypeChecker::visitExprGrouping(Expr::Grouping& expr)
 	{
 		return nullptr;
 	}
-	return this->accept(*expr.expression).release();
+	std::unique_ptr<TypeName> type = this->accept(*expr.expression);
+	expr.type = *type;
+	return type.release();
 }
 
 void* TypeChecker::visitExprLiteral(Expr::Literal& expr)
 {
 	if (expr.literal.literal.string)
 	{
-		return new TypeName(true, "string");
+		TypeName* type = new TypeName(true, "string");
+		expr.type = *type;
+		return type;
 	}
 	if (expr.literal.literal.number)
 	{
-		return new TypeName(true, "number");
+		TypeName* type = new TypeName(true, "number");
+		expr.type = *type;
+		return type;
 	}
 	if (expr.literal.literal.boolean)
 	{
-		return new TypeName(true, "boolean");
+		TypeName* type = new TypeName(true, "boolean");
+		expr.type = *type;
+		return type;
 	}
 	this->error(expr.literal, "Literal value did not have a type.");
 	return nullptr;
@@ -321,6 +330,7 @@ void* TypeChecker::visitExprUnary(Expr::Unary& expr)
 		return nullptr;
 	}
 	const TypeName& return_type = returned.type();
+	expr.type = return_type;
 	return std::make_unique<TypeName>(return_type).release();
 }
 
@@ -334,7 +344,9 @@ void* TypeChecker::visitExprVariable(Expr::Variable& expr)
 	}
 	if (this->types.count(info->type.underlying()))
 	{
-		return new TypeName(info->type);
+		TypeName* type = new TypeName(info->type);
+		expr.type = *type;
+		return type;
 	}
 	this->error(expr.name, std::string("No such type exists with name ") + info->type.type_name() + " for using variable " + expr.name.lexeme);
 	return nullptr;
@@ -417,6 +429,7 @@ void* TypeChecker::visitExprAssignment(Expr::Assignment& expr)
 			" and value is of type " + value_type->type_name());
 		return nullptr;
 	}
+	expr.type = *value_type;
 	return value_type.release();
 }
 
@@ -476,7 +489,9 @@ void* TypeChecker::visitExprCall(Expr::Call& expr)
 			function_type.return_type().type_name() + "\")");
 		return nullptr;
 	}
-	return new TypeName(function_type.return_type());
+	TypeName* type = new TypeName(function_type.return_type());
+	expr.type = *type;
+	return type;
 }
 
 void* TypeChecker::visitExprLogical(Expr::Logical& expr)
@@ -493,6 +508,7 @@ void* TypeChecker::visitExprLogical(Expr::Logical& expr)
 			right_type->type_name() + " (requires boolean operations)");
 		return nullptr;
 	}
+	expr.type = *left_type;
 	return left_type.release();
 }
 

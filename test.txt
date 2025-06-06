@@ -8,6 +8,7 @@ function foo() -> const number
 
 function bar() -> const string*
 {
+	asm "move sp 5";
 	return &"hello";
 }
 
