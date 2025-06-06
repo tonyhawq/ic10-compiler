@@ -34,6 +34,7 @@ enum class TokenType
 	STRING,
 	HASHED_STRING,
 
+	QUESTION,
 	CONST,
 	AND,
 	OR,

@@ -1,16 +1,18 @@
 #include "AST.h"
 
-void TypeName::make_pointer_type(bool constant)
+void TypeName::make_pointer_type(bool constant, bool nullable)
 {
 	TypeName pointer_type;
 	pointer_type.constant = constant;
 	pointer_type.pointer = true;
+	pointer_type.m_nullable = std::make_unique<bool>(nullable);
 	pointer_type.m_pointed_to_type = std::make_unique<TypeName>(std::move(*this));
 	*this = std::move(pointer_type);
 }
 TypeName::TypeName(const TypeName& other)
 	:constant(other.constant), pointer(other.pointer), m_type_name(other.m_type_name ? std::make_unique<std::string>(*other.m_type_name) : nullptr),
-	m_pointed_to_type(other.m_pointed_to_type ? std::make_unique<TypeName>(*other.m_pointed_to_type) : nullptr)
+	m_pointed_to_type(other.m_pointed_to_type ? std::make_unique<TypeName>(*other.m_pointed_to_type) : nullptr),
+	m_nullable(other.m_nullable ? std::make_unique<bool>(*other.m_nullable) : nullptr)
 {}
 
 TypeName& TypeName::operator=(const TypeName& other)
@@ -21,6 +23,7 @@ TypeName& TypeName::operator=(const TypeName& other)
 		pointer = other.pointer;
 		m_type_name = other.m_type_name ? std::make_unique<std::string>(*other.m_type_name) : nullptr;
 		m_pointed_to_type = other.m_pointed_to_type ? std::make_unique<TypeName>(*other.m_pointed_to_type) : nullptr;
+		m_nullable = other.m_nullable ? std::make_unique<bool>(*other.m_nullable) : nullptr;
 	}
 	return *this;
 }
@@ -34,6 +37,15 @@ TypeName TypeName::underlying() const
 	return TypeName(*this->m_type_name);
 }
 
+bool TypeName::nullable() const
+{
+	if (this->pointer)
+	{
+		return *this->m_nullable;
+	}
+	return false;
+}
+
 std::string TypeName::type_name() const
 {
 	if (this->pointer)
@@ -43,9 +55,14 @@ std::string TypeName::type_name() const
 		{
 			dtype_name += " const";
 		}
-		return dtype_name + " *";
+		dtype_name += " *";
+		if (this->nullable())
+		{
+			dtype_name += "?";
+		}
+		return dtype_name;
 	}
-	return std::string(*this->m_type_name) + (this->constant ? " const" : "");
+	return (this->constant ? std::string("const ") : std::string("")) + *this->m_type_name;
 }
 
 int TypeName::height() const
@@ -72,6 +89,10 @@ bool TypeName::const_unqualified_equals(const TypeName& other) const
 
 bool TypeName::operator==(const TypeName& other) const
 {
+	if (this == &other)
+	{
+		return true;
+	}
 	if (this->constant != other.constant)
 	{
 		return false;
@@ -82,7 +103,7 @@ bool TypeName::operator==(const TypeName& other) const
 	}
 	if (!this->pointer && !other.pointer)
 	{
-		return *this->m_type_name == *other.m_type_name;
+		return (*this->m_type_name) == (*other.m_type_name);
 	}
 	return false;
 }

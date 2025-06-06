@@ -16,10 +16,11 @@ struct TypeName
 	TypeName(TypeName&& other) noexcept = default;
 	TypeName& operator=(TypeName&& other) noexcept = default;
 
-	void make_pointer_type(bool constant);
+	void make_pointer_type(bool constant, bool nullable);
 
 	TypeName underlying() const;
 	std::string type_name() const;
+	bool nullable() const;
 
 	int height() const;
 
@@ -29,6 +30,7 @@ struct TypeName
 
 	bool constant;
 	bool pointer;
+	std::unique_ptr<bool> m_nullable;
 	std::unique_ptr<TypeName> m_pointed_to_type;
 	std::unique_ptr<std::string> m_type_name;
 private:

@@ -107,30 +107,34 @@ void Parser::synchronize()
 
 TypeName Parser::parse_type()
 {
-	const Token& type = this->consume(TokenType::IDENTIFIER, "Expected type name");
-	TypeName type_info = TypeName(false, type.lexeme);
-	bool parsing_decorations = true;
-	while (parsing_decorations)
+	bool base_is_const = false;
+	if (this->match({ TokenType::CONST }))
 	{
-		switch (this->peek().type)
+		base_is_const = true;
+	}
+	const Token& type = this->consume(TokenType::IDENTIFIER, "Expected type name");
+	TypeName type_info = TypeName(base_is_const, type.lexeme);
+	while (true)
+	{
+		bool is_const = false;
+		if (this->match({ TokenType::CONST }))
 		{
-		case TokenType::CONST:
-			this->advance();
-			if (this->match({ TokenType::STAR }))
+			is_const = true;
+		}
+		if (!this->match({ TokenType::STAR }))
+		{
+			if (is_const)
 			{
-				type_info.make_pointer_type(true);
-				break;
+				this->error(this->peek(), "Expected * in pointer decl");
 			}
-			type_info.constant = true;
-			break;
-		case TokenType::STAR:
-			this->advance();
-			type_info.make_pointer_type(false);
-			break;
-		default:
-			parsing_decorations = false;
 			break;
 		}
+		bool is_nullable = false;
+		if (this->match({ TokenType::QUESTION }))
+		{
+			is_nullable = true;
+		}
+		type_info.make_pointer_type(is_const, is_nullable);
 	}
 	return type_info;
 }

@@ -22,7 +22,7 @@ std::unordered_map<std::string, TokenType> Scanner::keywords = {
 	{"asm", TokenType::ASM},
 	{"print", TokenType::PRINT},
 	{"struct", TokenType::STRUCT},
-	{"const", TokenType::CONST}
+	{"const", TokenType::CONST},
 };
 
 Scanner::Scanner(Compiler& compiler, const std::string& in)
@@ -224,6 +224,7 @@ void Scanner::scan_token()
 		CHECK_SINGLE_TOKEN('*', TokenType::STAR);
 		CHECK_SINGLE_TOKEN('&', TokenType::AMPERSAND);
 		CHECK_SINGLE_TOKEN('|', TokenType::BAR);
+		CHECK_SINGLE_TOKEN('?', TokenType::QUESTION);
 
 		CHECK_TWO_TOKENS('!', '=', TokenType::BANG, TokenType::BANG_EQUAL);
 		CHECK_TWO_TOKENS('-', '>', TokenType::MINUS, TokenType::ARROW);

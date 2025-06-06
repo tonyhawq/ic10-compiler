@@ -74,5 +74,8 @@
     <ClInclude Include="src\Optimizer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\OwningPtr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -44,40 +44,13 @@ const std::vector<TypeID::FunctionParam>& TypeID::arguments() const
 	return_type = ReturnType(val);\
 } } while (0)
 
-static TypeName apply_transformation(const TypeName& to, const TypeName& transform)
-{
-	TypeName transformed = to;
-	int height = transform.height();
-	// 5 layer pointer
-	for (int i = 0; i < height; i++)
-	{
-		const TypeName* transformation_to_use = &transform;
-		// to get 1st layer (4 from top)
-		// iterate 4 times
-		for (int j = 0; j < height - i - 1; j++)
-		{
-			transformation_to_use = transformation_to_use->m_pointed_to_type.get();
-		}
-		bool constant = transformation_to_use->constant;
-		if (transformation_to_use->pointer)
-		{
-			transformed.make_pointer_type(constant);
-		}
-		else
-		{
-			transformed.constant = constant;
-		}
-	}
-	return transformed;
-}
-
-TypeChecker::Operator::Overload::Overload(const TypeName& return_type) :m_return_type(return_type)
+TypeChecker::OperatorOverload::OperatorOverload(const TypeName& return_type, const std::vector<TypeName>& args) :m_return_type(return_type), arg_types(args)
 {}
 
-TypeChecker::Operator::Overload::~Overload()
+TypeChecker::OperatorOverload::~OperatorOverload()
 {}
 
-TypeChecker::Operator::ReturnType TypeChecker::Operator::Overload::return_type(const std::vector<TypeName>& args) const
+TypeChecker::Operator::ReturnType TypeChecker::OperatorOverload::return_type(const std::vector<TypeName>& args) const
 {
 	if (args.size() != this->arg_types.size())
 	{
@@ -100,7 +73,7 @@ TypeChecker::Operator::ReturnType TypeChecker::Operator::return_type(const std::
 	ReturnType return_type = ReturnType();
 	for (const auto& overload : this->overloads)
 	{
-		ReturnType overload_return_type = overload.return_type(args);
+		ReturnType overload_return_type = overload->return_type(args);
 		if (overload_return_type.failed())
 		{
 			OPERATOR_OVERLOADING_RETURN_TYPE_GET_OR_MAKE_FAILURE_MODE(std::string("Operator overloading failed for operator ") + this->operator_name);
@@ -116,6 +89,45 @@ TypeChecker::Operator::ReturnType TypeChecker::Operator::return_type(const std::
 		throw std::runtime_error("TYPECHECKER ERROR: !NO OVERLOADS PROVIDED FOR OPERATOR!");
 	}
 	return return_type;
+}
+
+TypeChecker::OperatorOverload::Addressof::Addressof()
+	:OperatorOverload(TypeName("void"), {})
+{}
+
+TypeChecker::OperatorOverload::Addressof::~Addressof()
+{}
+
+TypeChecker::Operator::ReturnType TypeChecker::OperatorOverload::Addressof::return_type(const std::vector<TypeName>& args) const
+{
+	if (args.size() != 1)
+	{
+		return Operator::ReturnType("Requires 1 argument.");
+	}
+	TypeName arg = args.at(0);
+	arg.make_pointer_type(false, false);
+	return arg;
+}
+
+TypeChecker::OperatorOverload::Deref::Deref()
+	:OperatorOverload(TypeName("void"), {})
+{}
+
+TypeChecker::OperatorOverload::Deref::~Deref()
+{}
+
+TypeChecker::Operator::ReturnType TypeChecker::OperatorOverload::Deref::return_type(const std::vector<TypeName>& args) const
+{
+	if (args.size() != 1)
+	{
+		return Operator::ReturnType("Requires 1 argument.");
+	}
+	TypeName arg = args.at(0);
+	if (!arg.pointer)
+	{
+		return Operator::ReturnType("Cannot dereference a non-pointer type.");
+	}
+	return *arg.m_pointed_to_type;
 }
 
 bool TypeChecker::Operator::ReturnType::failed() const
@@ -157,61 +169,64 @@ TypeChecker::TypeChecker(Compiler& compiler, std::vector<std::unique_ptr<Stmt>>&
 	this->types.emplace(t_void, TypeID{ t_void, false, nullptr, nullptr });
 	
 	this->define_operator(TokenType::GREATER, "op_greater", {
-		Operator::Overload{t_boolean, nullptr, {{t_number, false}, {t_number, false}}}
+		new OperatorOverload{t_boolean, {t_number, t_number}}
 		});
 	this->define_operator(TokenType::GREATER_EQUAL, "op_greater_equal", {
-		Operator::Overload{t_boolean, nullptr, {{t_number, false}, {t_number, false}}}
+		new OperatorOverload{t_boolean, {t_number, t_number}}
 		});
 	this->define_operator(TokenType::LESS, "op_less", {
-		Operator::Overload{t_boolean, nullptr, {{t_number, false}, {t_number, false}}}
+		new OperatorOverload{t_boolean, {t_number, t_number}}
 		});
 	this->define_operator(TokenType::LESS_EQUAL, "op_less_equal", {
-		Operator::Overload{t_boolean, nullptr, {{t_number, false}, {t_number, false}}}
+		new OperatorOverload{t_boolean, {t_number, t_number}}
 		});
 	this->define_operator(TokenType::PLUS, "op_plus", {
-		Operator::Overload{t_number, nullptr, {{t_number, false}, {t_number, false}}}
+		new OperatorOverload{t_number, {t_number, t_number}}
 		});
 	this->define_operator(TokenType::MINUS, "op_minus", {
-		Operator::Overload{t_number, nullptr, {{t_number, false}}},
-		Operator::Overload{t_number, nullptr, {{t_number, false}, {t_number, false}}}}
+		new OperatorOverload{t_number, {t_number}},
+		new OperatorOverload{t_number, {t_number, t_number}}}
 		); // includes unary -
 	this->define_operator(TokenType::STAR, "op_star", {
-		Operator::Overload{t_number, nullptr, {{t_number, false}, {t_number, false}}}
+		new OperatorOverload{t_number, {t_number, t_number}}
 		});
 	this->define_operator(TokenType::SLASH, "op_div", {
-		Operator::Overload{t_number, nullptr, {{t_number, false}, {t_number, false}}}
+		new OperatorOverload{t_number, {t_number, t_number}}
 		});
 	this->define_operator(TokenType::EQUAL_EQUAL, "op_equality", {
-		Operator::Overload{t_boolean, nullptr, {{t_number, false}, {t_number, false}}},
-		Operator::Overload{t_boolean, nullptr, {{t_boolean, false}, {t_boolean, false}}}
+		new OperatorOverload{t_boolean, {t_number, t_number}},
+		new OperatorOverload{t_boolean, {t_boolean, t_boolean}}
 		});
 	this->define_operator(TokenType::BANG_EQUAL, "op_inverse_equality", {
-		Operator::Overload{t_boolean, nullptr, {{t_number, false}, {t_number, false}}},
-		Operator::Overload{t_boolean, nullptr, {{t_boolean, false}, {t_boolean, false}}}
+		new OperatorOverload{t_boolean, {t_number, t_number}},
+		new OperatorOverload{t_boolean, {t_boolean, t_boolean}}
 		});
 	this->define_operator(TokenType::BANG, "unary_not", {
-		Operator::Overload{t_number, nullptr, {{t_number, false}}},
+		new OperatorOverload{t_number, {t_number}},
 		});
-	TypeName t_number_ptr = t_number;
-	t_number_ptr.make_pointer_type(false);
-	this->define_operator(TokenType::AMPERSAND, "addressof", {
-		Operator::Overload{t_number, std::make_unique<TypeName>(t_number_ptr), {{t_number, true}}}
+	this->define_operator(TokenType::AMPERSAND, "op_addressof", {
+		new OperatorOverload::Addressof()
 		});
-	this->define_operator(TokenType::BAR, "deref", {
-		Operator::Overload{t_number, nullptr, {{t_number_ptr}}}
+	this->define_operator(TokenType::BAR, "op_deref", {
+		new OperatorOverload::Deref()
 		});
-
 	this->define_library_function("dopen", t_Device, { t_number });
 	this->define_library_function("yield", t_void, {});
 }
 
-void TypeChecker::define_operator(TokenType type, const std::string& name, std::vector<Operator::Overload> overloads)
+void TypeChecker::define_operator(TokenType type, const std::string& name, std::vector<OwningPtr<OperatorOverload>> overloads)
 {
 	if (this->operator_types.count(type))
 	{
 		throw std::runtime_error("TYPECHECK ERROR: !ATTEMPTED TO CREATE EXISTENT OPERATOR!");
 	}
-	this->operator_types.emplace(type, std::move(Operator(name, std::move(overloads))));
+	std::vector<std::unique_ptr<OperatorOverload>> fixed_overloads;
+	fixed_overloads.reserve(overloads.size());
+	for (auto& overload : overloads)
+	{
+		fixed_overloads.emplace_back(overload.ptr);
+	}
+	this->operator_types.emplace(type, std::move(Operator(name, std::move(fixed_overloads))));
 }
 
 void TypeChecker::define_library_function(const std::string& name, const TypeName& return_type, const std::vector<TypeName>& arg_types)
@@ -252,11 +267,6 @@ void* TypeChecker::visitExprBinary(Expr::Binary& expr)
 	std::unique_ptr<TypeName> right_type = this->accept(*expr.right);
 	if (!left_type || !right_type)
 	{
-		return nullptr;
-	}
-	if (left_type != right_type)
-	{
-		this->error(expr.op, "Attempted to perform an operation on two dissimilar types.");
 		return nullptr;
 	}
 	Operator& op = this->operator_types.at(expr.op.type);
@@ -343,17 +353,17 @@ bool TypeChecker::can_initalize(const TypeName& to, const TypeName& from)
 		return false;
 	}
 	// possible equality
-	// eg: number const, number
+	// eg: const number, number
 	if (to.pointer)
 	{
 		if (to.constant)
 		{
 			return true;
 		}
-		// cannot initalize a number* from a number const*
+		// cannot initalize a number* from a const number*
 		return false;
 	}
-	// can initalize a number from a number const
+	// can initalize a number from a const number (with copy)
 	return true;
 }
 

@@ -2,6 +2,7 @@
 
 #include <unordered_map>
 #include <string>
+#include "OwningPtr.h"
 
 #include "AST.h"
 #include "Parser.h"
@@ -42,6 +43,7 @@ public:
 	};
 	
 	struct Operator;
+	class OperatorOverload;
 
 	TypeChecker(Compiler& compiler, std::vector<std::unique_ptr<Stmt>>& statements);
 	Environment* env;
@@ -50,7 +52,7 @@ public:
 	std::unordered_map<TokenType, Operator> operator_types;
 
 	void define_library_function(const std::string& name, const TypeName& return_type, const std::vector<TypeName>& params);
-	void define_operator(TokenType type, const std::string& name, std::vector<Operator::Overload> overloads);
+	void define_operator(TokenType type, const std::string& name, std::vector<OwningPtr<OperatorOverload>> overloads);
 
 	void check();
 	void evaluate(std::vector<std::unique_ptr<Stmt>>& statements);
@@ -89,28 +91,44 @@ private:
 
 struct TypeChecker::Operator
 {
-	class Overload;
 	class ReturnType;
 
 	ReturnType return_type(const std::vector<TypeName>& args);
 
-	Operator(const std::string& operator_name, std::vector<Overload> overloads) :operator_name(operator_name), overloads(std::move(overloads)) {};
+	Operator(const std::string& operator_name, std::vector<std::unique_ptr<OperatorOverload>> overloads) :operator_name(operator_name), overloads(std::move(overloads)) {};
 
 	std::string operator_name;
-	std::vector<std::unique_ptr<Overload>> overloads;
+	std::vector<std::unique_ptr<OperatorOverload>> overloads;
 };
 
-class TypeChecker::Operator::Overload
+class TypeChecker::OperatorOverload
 {
 public:
-	class SimpleOverload;
+	class Addressof;
+	class Deref;
 
-	Overload(const TypeName& return_type);
-	virtual ~Overload();
-	virtual ReturnType return_type(const std::vector<TypeName>& args) const;
+	OperatorOverload(const TypeName& return_type, const std::vector<TypeName>& arg_types);
+	virtual ~OperatorOverload();
+	virtual Operator::ReturnType return_type(const std::vector<TypeName>& args) const;
 protected:
 	TypeName m_return_type;
 	std::vector<TypeName> arg_types;
+};
+
+class TypeChecker::OperatorOverload::Addressof : public TypeChecker::OperatorOverload
+{
+public:
+	Addressof();
+	virtual ~Addressof();
+	virtual Operator::ReturnType return_type(const std::vector<TypeName>& args) const;
+};
+
+class TypeChecker::OperatorOverload::Deref : public TypeChecker::OperatorOverload
+{
+public:
+	Deref();
+	virtual ~Deref();
+	virtual Operator::ReturnType return_type(const std::vector<TypeName>& args) const;
 };
 
 class TypeChecker::Operator::ReturnType

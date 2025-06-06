@@ -141,6 +141,7 @@
   <ItemGroup>
     <ClInclude Include="src\Optimizer.h" />
     <ClInclude Include="src\Interpreter.h" />
+    <ClInclude Include="src\OwningPtr.h" />
     <ClInclude Include="src\Parser.h" />
     <ClInclude Include="src\AST.h" />
     <ClInclude Include="src\Errors.h" />
