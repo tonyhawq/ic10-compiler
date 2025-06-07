@@ -15,9 +15,14 @@ void Optimizer::optimize()
 
 void Optimizer::evaluate(std::vector<std::unique_ptr<Stmt>>& statements)
 {
-	for (auto& statement : statements)
+	for (int i = 0; i < statements.size(); i++)
 	{
-		statement->accept(*this);
+		std::unique_ptr<Stmt>& statement = statements[i];
+		std::unique_ptr<Stmt> stmt = std::unique_ptr<Stmt>(static_cast<Stmt*>(statement->accept(*this)));
+		if (stmt)
+		{
+			statements[i] = std::move(stmt);
+		}
 	}
 }
 
@@ -242,17 +247,22 @@ void* Optimizer::visitStmtBlock(Stmt::Block& stmt)
 void* Optimizer::visitStmtIf(Stmt::If& stmt)
 {
 	Expr::Literal* condition_literal = static_cast<Expr::Literal*>(stmt.condition->accept(*this));
-	if (condition_literal->literal.literal.boolean)
+	if (condition_literal)
 	{
-		if (*condition_literal->literal.literal.boolean)
+		if (condition_literal->literal.literal.boolean)
 		{
-			return stmt.branch_true.release();
+			if (*condition_literal->literal.literal.boolean)
+			{
+				printf("Branching on constant simplified to true branch.\n");
+				return stmt.branch_true.release();
+			}
+			if (stmt.branch_false)
+			{
+				printf("Branching on constant simplified to false branch.\n");
+				return stmt.branch_false.release();
+			}
+			return new Stmt::Block({});
 		}
-		if (stmt.branch_false)
-		{
-			return stmt.branch_false.release();
-		}
-		return new Stmt::Block({});
 	}
 	stmt.branch_true->accept(*this);
 	if (stmt.branch_false)

@@ -191,6 +191,43 @@ TypedEnvironment& TypedEnvironment::Leaf::progenitor()
 	return *this->m_progenitor;
 }
 
+int TypedEnvironment::Leaf::scopes_to_definition(const Identifier& identifier) const
+{
+	if (this->m_variables.find(identifier) != this->m_variables.end())
+	{
+		return 0;
+	}
+	if (!this->parent)
+	{
+		return -1;
+	}
+	int parent_scopes = this->parent->scopes_to_definition(identifier);
+	if (parent_scopes == -1)
+	{
+		return -1;
+	}
+	return parent_scopes + 1;
+}
+
+TypedEnvironment::Leaf::LongerLived TypedEnvironment::Leaf::longer_lived(const Variable& a, const Variable& b)
+{
+	int a_scopes = this->scopes_to_definition(a.identifier());
+	int b_scopes = this->scopes_to_definition(b.identifier());
+	if (a_scopes == -1 || b_scopes == -1)
+	{
+		return LongerLived::Undefined;
+	}
+	if (a_scopes == b_scopes)
+	{
+		return LongerLived::Same;
+	}
+	if (a_scopes > b_scopes)
+	{
+		return LongerLived::A;
+	}
+	return LongerLived::B;
+}
+
 #define OPERATOR_OVERLOADING_RETURN_TYPE_GET_OR_MAKE_FAILURE_MODE(val) do { if (!return_type.failed()) {\
 	return_type = ReturnType(val);\
 } } while (0)
@@ -688,7 +725,7 @@ void* TypeChecker::visitExprLogical(Expr::Logical& expr)
 	{
 		return nullptr;
 	}
-	if (*left_type != TypeName("boolean") || *right_type != TypeName("boolean"))
+	if (!left_type->const_unqualified_equals(TypeName("boolean")) || !right_type->const_unqualified_equals(TypeName("boolean")))
 	{
 		this->error(expr.op, std::string("Attempted to logically compare ") + left_type->type_name() + " with " +
 			right_type->type_name() + " (requires boolean operations)");
@@ -797,7 +834,7 @@ void* TypeChecker::visitStmtIf(Stmt::If& stmt)
 		return nullptr;
 	}
 	bool had_error = false;
-	if (*condition_type != TypeName("boolean"))
+	if (!condition_type->const_unqualified_equals(TypeName("boolean")))
 	{
 		this->error(stmt.token, "Attempted to branch on a non-boolean condition.");
 		had_error = true;
@@ -960,8 +997,8 @@ void TypeChecker::evaluate(std::vector<std::unique_ptr<Stmt>>& statements)
 {
 	for (auto& statement : statements)
 	{
-		statement->accept(*this);
 		this->program.add_statement(statement, *this->env);
+		statement->accept(*this);
 	}
 }
 

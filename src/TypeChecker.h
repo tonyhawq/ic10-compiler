@@ -104,8 +104,17 @@ public:
 
 	const std::string* function() const;
 	bool define_variable(const TypeName& type, const Identifier& identifier);
+	enum class LongerLived
+	{
+		A,
+		B,
+		Same,
+		Undefined
+	};
+	LongerLived longer_lived(const Variable& a, const Variable& b);
 
 	const std::list<Leaf>& children() const;
+	int scopes_to_definition(const Identifier& identifier) const;
 	const Variable* get_variable(const Identifier& identifier) const;
 private:
 	TypedEnvironment* m_progenitor;

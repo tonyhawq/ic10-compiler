@@ -15,7 +15,6 @@ std::string CodeGenerator::generate()
 {
 	try
 	{
-		this->m_program.statement_environment()
 	}
 	catch (CodeGenerationError)
 	{
