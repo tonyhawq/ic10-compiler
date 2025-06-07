@@ -10,7 +10,7 @@ Optimizer::Optimizer(Compiler& compiler, TypeCheckedProgram & env)
 
 void Optimizer::optimize()
 {
-	this->evaluate(this->m_env.statements);
+	this->evaluate(this->m_env.statements());
 }
 
 void Optimizer::evaluate(std::vector<std::unique_ptr<Stmt>>& statements)

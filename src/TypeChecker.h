@@ -70,36 +70,68 @@ private:
 class TypedEnvironment
 {
 public:
-	explicit TypedEnvironment();
-	TypedEnvironment(TypedEnvironment* parent);
+	class Leaf;
+
+	TypedEnvironment();
 	~TypedEnvironment();
 	TypedEnvironment(const TypedEnvironment& other) = delete;
-	TypedEnvironment(TypedEnvironment&& other) noexcept;
+	TypedEnvironment(TypedEnvironment&& other) = default;
 
-	TypedEnvironment* spawn_inside_function(const std::string& name);
-	TypedEnvironment* spawn();
-	TypedEnvironment* get_parent();
+	Leaf* root();
+	size_t advance(Leaf* advance_for);
+	void reassign(size_t id, Leaf* new_node);
+private:
+	std::unordered_map<size_t, Leaf*> leaves;
+	size_t next_id;
+	std::unique_ptr<Leaf> m_root;
+};
+
+class TypedEnvironment::Leaf
+{
+public:
+	explicit Leaf(TypedEnvironment& progenitor);
+	Leaf(Leaf* parent);
+	~Leaf();
+	Leaf(const Leaf& other) = delete;
+	Leaf(Leaf&& other) noexcept;
+
+	TypedEnvironment& progenitor();
+
+	Leaf* spawn_inside_function(const std::string& name);
+	Leaf* spawn();
+	Leaf* get_parent();
+	size_t leaf_id() const;
 
 	const std::string* function() const;
 	bool define_variable(const TypeName& type, const Identifier& identifier);
 
-	const std::list<TypedEnvironment>& children() const;
+	const std::list<Leaf>& children() const;
 	const Variable* get_variable(const Identifier& identifier) const;
 private:
+	TypedEnvironment* m_progenitor;
+	size_t id;
 	std::unique_ptr<std::string> m_function_name;
-	TypedEnvironment* parent;
-	std::list<TypedEnvironment> m_children;
+	Leaf* parent;
+	std::list<Leaf> m_children;
 	std::unordered_map<Identifier, Variable> m_variables;
 };
 
 class TypeCheckedProgram
 {
 public:
-	TypeCheckedProgram(std::vector<std::unique_ptr<Stmt>> statements) :statements(std::move(statements)) {};
+	class Statement;
+
+	TypeCheckedProgram(std::vector<std::unique_ptr<Stmt>> statements);
+	void add_statement(std::unique_ptr<Stmt>& statement, TypedEnvironment::Leaf& containing_env);
 	
-	TypedEnvironment env;
-	std::vector<std::unique_ptr<Stmt>> statements;
+	const std::vector<std::unique_ptr<Stmt>>& statements() const;
+	std::vector<std::unique_ptr<Stmt>>& statements();
+	TypedEnvironment& env();
+	TypedEnvironment::Leaf& statement_environment(Stmt* statement);
 private:
+	std::unordered_map<Stmt*, TypedEnvironment::Leaf*> ptr_to_leaf;
+	TypedEnvironment m_env;
+	std::vector<std::unique_ptr<Stmt>> m_statements;
 };
 
 class TypeChecker : public Expr::Visitor, public Stmt::Visitor
@@ -149,14 +181,13 @@ public:
 	virtual void* visitStmtFunction(Stmt::Function& expr) override;
 	virtual void* visitStmtReturn(Stmt::Return& expr) override;
 private:
-	TypedEnvironment global_env;
-	TypedEnvironment* env;
+	TypeCheckedProgram program;
+	TypedEnvironment::Leaf* env;
 
 	std::unordered_map<TypeName, TypeID> types;
 	std::unordered_map<TokenType, Operator> operator_types;
 
 	Pass current_pass;
-	std::vector<std::unique_ptr<Stmt>> statements_to_typecheck;
 	Compiler& compiler;
 };
 

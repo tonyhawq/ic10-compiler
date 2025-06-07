@@ -68,38 +68,77 @@ const Identifier& Variable::identifier() const
 	return this->m_identifier;
 }
 
-TypedEnvironment::TypedEnvironment() :parent(nullptr)
-{}
-
-TypedEnvironment::TypedEnvironment(TypedEnvironment* parent) :parent(parent)
-{}
+TypedEnvironment::TypedEnvironment()
+	:next_id(0)
+{
+	this->m_root = std::make_unique<TypedEnvironment::Leaf>(*this);
+	this->leaves[this->next_id] = this->m_root.get();
+}
 
 TypedEnvironment::~TypedEnvironment()
 {}
 
-TypedEnvironment::TypedEnvironment(TypedEnvironment&& other) noexcept
-	:m_function_name(std::move(other.m_function_name)), parent(other.parent), m_children(std::move(other.m_children)), m_variables(std::move(other.m_variables))
+size_t TypedEnvironment::advance(Leaf* advance_for)
+{
+	size_t id = this->next_id;
+	this->next_id++;
+	this->leaves[id] = advance_for;
+	return id;
+}
+
+void TypedEnvironment::reassign(size_t id, Leaf* new_node)
+{
+	if (!this->leaves.count(id))
+	{
+		throw std::runtime_error("No leaf exists.");
+	}
+	this->leaves[id] = new_node;
+}
+
+TypedEnvironment::Leaf* TypedEnvironment::root()
+{
+	return this->m_root.get();
+}
+
+TypedEnvironment::Leaf::Leaf(TypedEnvironment& progenitor) :parent(nullptr), m_progenitor(&progenitor), id(0)
+{
+	this->id = this->m_progenitor->advance(this);
+}
+
+TypedEnvironment::Leaf::Leaf(Leaf* parent) :parent(parent), m_progenitor(parent->m_progenitor)
+{
+	this->id = this->m_progenitor->advance(this);
+}
+
+TypedEnvironment::Leaf::~Leaf()
 {}
 
-TypedEnvironment* TypedEnvironment::spawn_inside_function(const std::string& name)
+TypedEnvironment::Leaf::Leaf(Leaf&& other) noexcept
+	:m_function_name(std::move(other.m_function_name)), parent(other.parent), m_children(std::move(other.m_children)), m_variables(std::move(other.m_variables)),
+	m_progenitor(other.m_progenitor), id(other.id)
 {
-	TypedEnvironment* env = this->spawn();
+	this->m_progenitor->reassign(this->id, this);
+}
+
+TypedEnvironment::Leaf* TypedEnvironment::Leaf::spawn_inside_function(const std::string& name)
+{
+	Leaf* env = this->spawn();
 	env->m_function_name = std::make_unique<std::string>(name);
 	return env;
 }
 
-TypedEnvironment* TypedEnvironment::spawn()
+TypedEnvironment::Leaf* TypedEnvironment::Leaf::spawn()
 {
-	this->m_children.push_back(TypedEnvironment(this));
+	this->m_children.push_back(Leaf(this));
 	return &this->m_children.back();
 }
 
-TypedEnvironment* TypedEnvironment::get_parent()
+TypedEnvironment::Leaf* TypedEnvironment::Leaf::get_parent()
 {
 	return this->parent;
 }
 
-const std::string* TypedEnvironment::function() const
+const std::string* TypedEnvironment::Leaf::function() const
 {
 	if (!this->m_function_name)
 	{
@@ -112,7 +151,7 @@ const std::string* TypedEnvironment::function() const
 	return this->m_function_name.get();
 }
 
-bool TypedEnvironment::define_variable(const TypeName& type, const Identifier& identifier)
+bool TypedEnvironment::Leaf::define_variable(const TypeName& type, const Identifier& identifier)
 {
 	const auto& var = this->m_variables.find(identifier);
 	if (var != this->m_variables.end())
@@ -123,12 +162,17 @@ bool TypedEnvironment::define_variable(const TypeName& type, const Identifier& i
 	return true;
 }
 
-const std::list<TypedEnvironment>& TypedEnvironment::children() const
+size_t TypedEnvironment::Leaf::leaf_id() const
+{
+	return this->id;
+}
+
+const std::list<TypedEnvironment::Leaf>& TypedEnvironment::Leaf::children() const
 {
 	return this->m_children;
 }
 
-const Variable* TypedEnvironment::get_variable(const Identifier& identifier) const
+const Variable* TypedEnvironment::Leaf::get_variable(const Identifier& identifier) const
 {
 	const auto& var = this->m_variables.find(identifier);
 	if (var != this->m_variables.end())
@@ -140,6 +184,11 @@ const Variable* TypedEnvironment::get_variable(const Identifier& identifier) con
 		return this->parent->get_variable(identifier);
 	}
 	return nullptr;
+}
+
+TypedEnvironment& TypedEnvironment::Leaf::progenitor()
+{
+	return *this->m_progenitor;
 }
 
 #define OPERATOR_OVERLOADING_RETURN_TYPE_GET_OR_MAKE_FAILURE_MODE(val) do { if (!return_type.failed()) {\
@@ -256,10 +305,43 @@ const TypeName& TypeChecker::Operator::ReturnType::type() const
 	return *this->m_type;
 }
 
-TypeChecker::TypeChecker(Compiler& compiler, std::vector<std::unique_ptr<Stmt>> statements)
-	:compiler(compiler), statements_to_typecheck(std::move(statements)), env(nullptr), global_env(), current_pass(Pass::Linking)
+TypeCheckedProgram::TypeCheckedProgram(std::vector<std::unique_ptr<Stmt>> statements)
+	:m_statements(std::move(statements))
+{}
+
+const std::vector<std::unique_ptr<Stmt>>& TypeCheckedProgram::statements() const
 {
-	env = &global_env;
+	return this->m_statements;
+}
+
+std::vector<std::unique_ptr<Stmt>>& TypeCheckedProgram::statements()
+{
+	return this->m_statements;
+}
+
+void TypeCheckedProgram::add_statement(std::unique_ptr<Stmt>& statement, TypedEnvironment::Leaf& containing_env)
+{
+	this->ptr_to_leaf[statement.get()] = &containing_env;
+}
+
+TypedEnvironment::Leaf& TypeCheckedProgram::statement_environment(Stmt* statement)
+{
+	if (!statement)
+	{
+		throw std::runtime_error("Attempted to get env of nullptr statement.");
+	}
+	return *this->ptr_to_leaf.at(statement);
+}
+
+TypedEnvironment& TypeCheckedProgram::env()
+{
+	return this->m_env;
+}
+
+TypeChecker::TypeChecker(Compiler& compiler, std::vector<std::unique_ptr<Stmt>> statements)
+	:compiler(compiler), env(nullptr), current_pass(Pass::Linking), program(std::move(statements))
+{
+	env = this->program.env().root();
 	TypeName t_number("number");
 	TypeName t_string("string");
 	TypeName t_Device("Device");
@@ -354,10 +436,10 @@ void TypeChecker::define_library_function(const std::string& name, const TypeNam
 TypeCheckedProgram TypeChecker::check()
 {
 	this->current_pass = Pass::Linking;
-	this->evaluate(this->statements_to_typecheck);
+	this->evaluate(this->program.statements());
 	this->current_pass = Pass::TypeChecking;
-	this->evaluate(this->statements_to_typecheck);
-	return TypeCheckedProgram(std::move(this->statements_to_typecheck));
+	this->evaluate(this->program.statements());
+	return std::move(this->program);
 }
 
 std::unique_ptr<TypeName> TypeChecker::accept(Expr& expression)
@@ -879,6 +961,7 @@ void TypeChecker::evaluate(std::vector<std::unique_ptr<Stmt>>& statements)
 	for (auto& statement : statements)
 	{
 		statement->accept(*this);
+		this->program.add_statement(statement, *this->env);
 	}
 }
 

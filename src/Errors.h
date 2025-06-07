@@ -9,3 +9,8 @@ public:
 private:
 };
 
+class CodeGenerationError
+{
+public:
+private:
+};
