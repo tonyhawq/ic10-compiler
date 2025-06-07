@@ -2,8 +2,9 @@
 
 #include <unordered_map>
 #include <string>
-#include "OwningPtr.h"
+#include <list>
 
+#include "OwningPtr.h"
 #include "AST.h"
 #include "Parser.h"
 
@@ -33,6 +34,74 @@ struct TypeID::FunctionParam
 	std::string name;
 };
 
+class Identifier
+{
+public:
+	Identifier(const std::string& name);
+
+	bool operator==(const Identifier& other) const;
+	
+	std::string name() const;
+private:
+	std::string m_name;
+};
+
+namespace std {
+	template <>
+	struct hash<Identifier> {
+		std::size_t operator()(const Identifier& key) const {
+			return std::hash<std::string>()(key.name());
+		}
+	};
+}
+
+class Variable
+{
+public:
+	Variable(const Identifier& identifier, const TypeName& type);
+
+	const TypeName& type() const;
+	const Identifier& identifier() const;
+private:
+	Identifier m_identifier;
+	TypeName m_type;
+};
+
+class TypedEnvironment
+{
+public:
+	explicit TypedEnvironment();
+	TypedEnvironment(TypedEnvironment* parent);
+	~TypedEnvironment();
+	TypedEnvironment(const TypedEnvironment& other) = delete;
+	TypedEnvironment(TypedEnvironment&& other) noexcept;
+
+	TypedEnvironment* spawn_inside_function(const std::string& name);
+	TypedEnvironment* spawn();
+	TypedEnvironment* get_parent();
+
+	const std::string* function() const;
+	bool define_variable(const TypeName& type, const Identifier& identifier);
+
+	const std::list<TypedEnvironment>& children() const;
+	const Variable* get_variable(const Identifier& identifier) const;
+private:
+	std::unique_ptr<std::string> m_function_name;
+	TypedEnvironment* parent;
+	std::list<TypedEnvironment> m_children;
+	std::unordered_map<Identifier, Variable> m_variables;
+};
+
+class TypeCheckedProgram
+{
+public:
+	TypeCheckedProgram(std::vector<std::unique_ptr<Stmt>> statements) :statements(std::move(statements)) {};
+	
+	TypedEnvironment env;
+	std::vector<std::unique_ptr<Stmt>> statements;
+private:
+};
+
 class TypeChecker : public Expr::Visitor, public Stmt::Visitor
 {
 public:
@@ -45,16 +114,12 @@ public:
 	struct Operator;
 	class OperatorOverload;
 
-	TypeChecker(Compiler& compiler, std::vector<std::unique_ptr<Stmt>>& statements);
-	Environment* env;
-
-	std::unordered_map<TypeName, TypeID> types;
-	std::unordered_map<TokenType, Operator> operator_types;
+	TypeChecker(Compiler& compiler, std::vector<std::unique_ptr<Stmt>> statements);
 
 	void define_library_function(const std::string& name, const TypeName& return_type, const std::vector<TypeName>& params);
 	void define_operator(TokenType type, const std::string& name, std::vector<OwningPtr<OperatorOverload>> overloads);
 
-	void check();
+	TypeCheckedProgram check();
 	void evaluate(std::vector<std::unique_ptr<Stmt>>& statements);
 	void error(const Token& token, const std::string& message);
 
@@ -84,8 +149,14 @@ public:
 	virtual void* visitStmtFunction(Stmt::Function& expr) override;
 	virtual void* visitStmtReturn(Stmt::Return& expr) override;
 private:
+	TypedEnvironment global_env;
+	TypedEnvironment* env;
+
+	std::unordered_map<TypeName, TypeID> types;
+	std::unordered_map<TokenType, Operator> operator_types;
+
 	Pass current_pass;
-	std::vector<std::unique_ptr<Stmt>>& statements_to_typecheck;
+	std::vector<std::unique_ptr<Stmt>> statements_to_typecheck;
 	Compiler& compiler;
 };
 

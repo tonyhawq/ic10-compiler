@@ -40,6 +40,108 @@ const std::vector<TypeID::FunctionParam>& TypeID::arguments() const
 	return *this->m_arguments;
 }
 
+Identifier::Identifier(const std::string& name)
+	:m_name(name)
+{}
+
+bool Identifier::operator==(const Identifier& other) const
+{
+	return this->m_name == other.m_name;
+}
+
+std::string Identifier::name() const
+{
+	return this->m_name;
+}
+
+Variable::Variable(const Identifier& identifier, const TypeName& type)
+	:m_identifier(identifier), m_type(type)
+{}
+
+const TypeName& Variable::type() const
+{
+	return this->m_type;
+}
+
+const Identifier& Variable::identifier() const
+{
+	return this->m_identifier;
+}
+
+TypedEnvironment::TypedEnvironment() :parent(nullptr)
+{}
+
+TypedEnvironment::TypedEnvironment(TypedEnvironment* parent) :parent(parent)
+{}
+
+TypedEnvironment::~TypedEnvironment()
+{}
+
+TypedEnvironment::TypedEnvironment(TypedEnvironment&& other) noexcept
+	:m_function_name(std::move(other.m_function_name)), parent(other.parent), m_children(std::move(other.m_children)), m_variables(std::move(other.m_variables))
+{}
+
+TypedEnvironment* TypedEnvironment::spawn_inside_function(const std::string& name)
+{
+	TypedEnvironment* env = this->spawn();
+	env->m_function_name = std::make_unique<std::string>(name);
+	return env;
+}
+
+TypedEnvironment* TypedEnvironment::spawn()
+{
+	this->m_children.push_back(TypedEnvironment(this));
+	return &this->m_children.back();
+}
+
+TypedEnvironment* TypedEnvironment::get_parent()
+{
+	return this->parent;
+}
+
+const std::string* TypedEnvironment::function() const
+{
+	if (!this->m_function_name)
+	{
+		if (!this->parent)
+		{
+			return nullptr;
+		}
+		return this->parent->function();
+	}
+	return this->m_function_name.get();
+}
+
+bool TypedEnvironment::define_variable(const TypeName& type, const Identifier& identifier)
+{
+	const auto& var = this->m_variables.find(identifier);
+	if (var != this->m_variables.end())
+	{
+		return false;
+	}
+	this->m_variables.emplace(identifier, Variable(identifier, type));
+	return true;
+}
+
+const std::list<TypedEnvironment>& TypedEnvironment::children() const
+{
+	return this->m_children;
+}
+
+const Variable* TypedEnvironment::get_variable(const Identifier& identifier) const
+{
+	const auto& var = this->m_variables.find(identifier);
+	if (var != this->m_variables.end())
+	{
+		return &var->second;
+	}
+	if (this->parent)
+	{
+		return this->parent->get_variable(identifier);
+	}
+	return nullptr;
+}
+
 #define OPERATOR_OVERLOADING_RETURN_TYPE_GET_OR_MAKE_FAILURE_MODE(val) do { if (!return_type.failed()) {\
 	return_type = ReturnType(val);\
 } } while (0)
@@ -154,9 +256,10 @@ const TypeName& TypeChecker::Operator::ReturnType::type() const
 	return *this->m_type;
 }
 
-TypeChecker::TypeChecker(Compiler& compiler, std::vector<std::unique_ptr<Stmt>>& statements)
-	:compiler(compiler), statements_to_typecheck(statements), env(new Environment(Environment::make_orphaned())), current_pass(Pass::Linking)
+TypeChecker::TypeChecker(Compiler& compiler, std::vector<std::unique_ptr<Stmt>> statements)
+	:compiler(compiler), statements_to_typecheck(std::move(statements)), env(nullptr), global_env(), current_pass(Pass::Linking)
 {
+	env = &global_env;
 	TypeName t_number("number");
 	TypeName t_string("string");
 	TypeName t_Device("Device");
@@ -238,7 +341,7 @@ void TypeChecker::define_library_function(const std::string& name, const TypeNam
 		params.push_back({ arg_type, "_" });
 	}
 	TypeName type = TypeChecker::get_function_signature(params, return_type);
-	this->env->define(type, name);
+	this->env->define_variable(type, name);
 	this->types.emplace(type, TypeID{
 		type,
 		true,
@@ -248,12 +351,13 @@ void TypeChecker::define_library_function(const std::string& name, const TypeNam
 	});
 }
 
-void TypeChecker::check()
+TypeCheckedProgram TypeChecker::check()
 {
 	this->current_pass = Pass::Linking;
 	this->evaluate(this->statements_to_typecheck);
 	this->current_pass = Pass::TypeChecking;
 	this->evaluate(this->statements_to_typecheck);
+	return TypeCheckedProgram(std::move(this->statements_to_typecheck));
 }
 
 std::unique_ptr<TypeName> TypeChecker::accept(Expr& expression)
@@ -336,19 +440,19 @@ void* TypeChecker::visitExprUnary(Expr::Unary& expr)
 
 void* TypeChecker::visitExprVariable(Expr::Variable& expr)
 {
-	Environment::VariableInfo* info = this->env->resolve(expr.name.lexeme);
+	const Variable* info = this->env->get_variable(expr.name.lexeme);
 	if (!info)
 	{
 		this->error(expr.name, std::string("Attempted to use variable \"") + expr.name.lexeme + "\" before it was defined.");
 		return nullptr;
 	}
-	if (this->types.count(info->type.underlying()))
+	if (this->types.count(info->type().underlying()))
 	{
-		TypeName* type = new TypeName(info->type);
+		TypeName* type = new TypeName(info->type());
 		expr.type = *type;
 		return type;
 	}
-	this->error(expr.name, std::string("No such type exists with name ") + info->type.type_name() + " for using variable " + expr.name.lexeme);
+	this->error(expr.name, std::string("No such type exists with name ") + info->type().type_name() + " for using variable " + expr.name.lexeme);
 	return nullptr;
 }
 
@@ -402,20 +506,20 @@ bool TypeChecker::can_assign(const TypeName& to, const TypeName& from)
 
 void* TypeChecker::visitExprAssignment(Expr::Assignment& expr)
 {
-	Environment::VariableInfo* info = this->env->resolve(expr.name.lexeme);
+	const Variable* info = this->env->get_variable(expr.name.lexeme);
 	if (!info)
 	{
 		this->error(expr.name, std::string("Attempted to assign variable \"") + expr.name.lexeme + "\" before it was defined.");
 		return nullptr;
 	}
 	std::unique_ptr<TypeName> var_type;
-	if (this->types.count(info->type.underlying()))
+	if (this->types.count(info->type().underlying()))
 	{
-		var_type = std::make_unique<TypeName>(info->type);
+		var_type = std::make_unique<TypeName>(info->type());
 	}
 	if (!var_type)
 	{
-		this->error(expr.name, std::string("No such type exists with name ") + info->type.type_name() + " for assigning to " + expr.name.lexeme);
+		this->error(expr.name, std::string("No such type exists with name ") + info->type().type_name() + " for assigning to " + expr.name.lexeme);
 		return nullptr;
 	}
 	std::unique_ptr<TypeName> value_type = this->accept(*expr.value);
@@ -558,7 +662,7 @@ void* TypeChecker::visitStmtVariable(Stmt::Variable& stmt)
 		this->error(stmt.name, std::string("Attempted to declare variable ") + stmt.name.lexeme + " as void.");
 		return nullptr;
 	}
-	bool success = this->env->define(stmt.type, stmt.name.lexeme);
+	bool success = this->env->define_variable(stmt.type, stmt.name.lexeme);
 	if (!stmt.initalizer)
 	{
 		this->error(stmt.name, std::string("Variable ") + stmt.name.lexeme + " is uninitalized.");
@@ -588,9 +692,9 @@ void* TypeChecker::visitStmtBlock(Stmt::Block& stmt)
 	{
 		return nullptr;
 	}
-	this->env = &this->env->spawn();
+	this->env = this->env->spawn();
 	this->evaluate(stmt.statements);
-	this->env = this->env->pop();
+	this->env = this->env->get_parent();
 	return nullptr;
 }
 
@@ -631,19 +735,19 @@ void* TypeChecker::visitStmtIf(Stmt::If& stmt)
 
 void* TypeChecker::visitStmtReturn(Stmt::Return& expr)
 {
-	if (!this->env->inside_function())
+	if (!this->env->get_parent())
 	{
 		this->error(expr.keyword, "Attempted to return from outside of a function.");
 		return nullptr;
 	}
-	const std::string& function_name = *this->env->function_name();
-	Environment::VariableInfo* info = this->env->resolve(function_name);
+	const std::string& function_name = *this->env->function();
+	const Variable* info = this->env->get_variable(function_name);
 	if (!info)
 	{
-		this->error(expr.keyword, "TYPECHECKER ERROR: !INSIDE NON-EXISTENT FUNCTION!");
+		throw std::runtime_error("TYPECHECKER ERROR: !INSIDE NON-EXISTENT FUNCTION!");
 		return nullptr;
 	}
-	TypeID& function_type = this->types.at(info->type);
+	TypeID& function_type = this->types.at(info->type());
 	if (function_type.return_type().underlying() == TypeName("void"))
 	{
 		if (expr.value)
@@ -696,7 +800,7 @@ void* TypeChecker::visitStmtFunction(Stmt::Function& expr)
 			args.push_back({ param_type, param_name.lexeme });
 		}
 		TypeName function_type = this->get_function_signature(args, expr.return_type);
-		bool success = this->env->define(function_type, expr.name.lexeme);
+		bool success = this->env->define_variable(function_type, expr.name.lexeme);
 		this->types.emplace(function_type, TypeID{
 			function_type,
 			true,
@@ -714,7 +818,7 @@ void* TypeChecker::visitStmtFunction(Stmt::Function& expr)
 	// typechecking
 
 	bool had_error = false;
-	this->env = &this->env->spawn_inside_function(expr.name.lexeme);
+	this->env = this->env->spawn_inside_function(expr.name.lexeme);
 	for (const auto& param : expr.params)
 	{
 		const TypeName& param_type = param.type;
@@ -726,7 +830,7 @@ void* TypeChecker::visitStmtFunction(Stmt::Function& expr)
 		}
 		else
 		{
-			this->env->define(param_type, param_name.lexeme);
+			this->env->define_variable(param_type, param_name.lexeme);
 		}
 	}
 	if (!this->types.count(expr.return_type.underlying()))
@@ -735,7 +839,7 @@ void* TypeChecker::visitStmtFunction(Stmt::Function& expr)
 		had_error = true;
 	}
 	this->evaluate(expr.body);
-	this->env = this->env->pop();
+	this->env = this->env->get_parent();
 	return nullptr;
 }
 

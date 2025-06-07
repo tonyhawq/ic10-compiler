@@ -19,15 +19,15 @@ void Compiler::compile(const std::string& path)
 	Parser parser(*this, std::move(tokens));
 	std::vector<std::unique_ptr<Stmt>> program = parser.parse();
 	printf("Typechecking...\n");
-	TypeChecker checker(*this, program);
-	checker.check();
+	TypeChecker checker(*this, std::move(program));
+	TypeCheckedProgram env = checker.check();
 	if (this->had_error)
 	{
 		printf("Aborting before code generation.\n");
 		return;
 	}
 	printf("Optimizing...\n");
-	Optimizer optimizer(*this, program);
+	Optimizer optimizer(*this, env);
 	optimizer.optimize();
 }
 

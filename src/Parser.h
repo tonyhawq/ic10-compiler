@@ -58,6 +58,7 @@ private:
 	const Token& peek_previous();
 	const Token& consume(TokenType type, const std::string& error_message);
 	void synchronize();
+	bool peek_var_decl();
 
 	TypeName parse_type();
 	std::unique_ptr<Stmt> parse_statement();

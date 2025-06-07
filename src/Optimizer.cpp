@@ -4,13 +4,13 @@
 #define BOOL_TO_STR(val) ((val) ? "true" : "false")
 #define FOLD_INTO(thing_to_fold_into, accepted) do { void* value = accepted; if (value) { thing_to_fold_into = std::shared_ptr<Expr::Literal>(static_cast<Expr::Literal*>(value)); } }  while (0)
 
-Optimizer::Optimizer(Compiler& compiler, std::vector<std::unique_ptr<Stmt>>& statements)
-	:compiler(compiler), m_statements(statements)
+Optimizer::Optimizer(Compiler& compiler, TypeCheckedProgram & env)
+	:compiler(compiler), m_env(env)
 {}
 
 void Optimizer::optimize()
 {
-	this->evaluate(this->m_statements);
+	this->evaluate(this->m_env.statements);
 }
 
 void Optimizer::evaluate(std::vector<std::unique_ptr<Stmt>>& statements)

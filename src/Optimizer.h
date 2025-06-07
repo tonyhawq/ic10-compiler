@@ -1,15 +1,14 @@
 #pragma once
 
 #include "AST.h"
+#include "TypeChecker.h"
 
 class Compiler;
 
-class Optimizer : public Expr::Visitor, Stmt::Visitor
+class Optimizer : public Expr::Visitor, public Stmt::Visitor
 {
 public:
-	class SymbolVisitor;
-
-	Optimizer(Compiler& compiler, std::vector<std::unique_ptr<Stmt>>& statements);
+	Optimizer(Compiler& compiler, TypeCheckedProgram& env);
 
 	void optimize();
 
@@ -34,5 +33,5 @@ public:
 	virtual void* visitStmtReturn(Stmt::Return& expr) override;
 private:
 	Compiler& compiler;
-	std::vector<std::unique_ptr<Stmt>>& m_statements;
+	TypeCheckedProgram& m_env;
 };

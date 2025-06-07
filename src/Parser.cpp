@@ -176,6 +176,14 @@ std::unique_ptr<Stmt> Parser::parse_function_declaration()
 	return std::make_unique<Stmt::Function>(name, std::move(return_type), params, std::move(body->statements));
 }
 
+bool Parser::peek_var_decl()
+{
+	return this->peek().type == TokenType::IDENTIFIER && (
+		this->peek_ahead(1).type == TokenType::IDENTIFIER ||
+		this->peek_ahead(1).type == TokenType::CONST ||
+		this->peek_ahead(1).type == TokenType::STAR
+		);
+}
 
 std::unique_ptr<Stmt> Parser::parse_symbols()
 {
@@ -185,24 +193,26 @@ std::unique_ptr<Stmt> Parser::parse_symbols()
 		{
 			return this->parse_function_declaration();
 		}
+		if (this->peek_var_decl())
+		{
+			return this->parse_variable_declaration();
+		}
+		this->error(this->peek(), "Expected declaration.");
 	}
 	catch (ParseError)
 	{
 		this->synchronize();
 		return nullptr;
 	}
-	return this->parse_declaration();
+	this->error(this->peek(), "??? Expected declaration.");
+	return nullptr;
 }
 
 std::unique_ptr<Stmt> Parser::parse_declaration()
 {
 	try
 	{
-		if (this->peek().type == TokenType::IDENTIFIER && (
-			this->peek_ahead(1).type == TokenType::IDENTIFIER ||
-			this->peek_ahead(1).type == TokenType::CONST ||
-			this->peek_ahead(1).type == TokenType::STAR
-			))
+		if (this->peek_var_decl())
 		{
 			return this->parse_variable_declaration();
 		}
