@@ -136,6 +136,7 @@
     <ClCompile Include="src\Compiler.cpp" />
     <ClCompile Include="src\Scanner.cpp" />
     <ClCompile Include="Source.cpp" />
+    <ClCompile Include="src\Timer.cpp" />
     <ClCompile Include="src\Token.cpp" />
     <ClCompile Include="src\TypeChecker.cpp" />
   </ItemGroup>
@@ -149,6 +150,7 @@
     <ClInclude Include="src\Errors.h" />
     <ClInclude Include="src\Compiler.h" />
     <ClInclude Include="src\Scanner.h" />
+    <ClInclude Include="src\Timer.h" />
     <ClInclude Include="src\Token.h" />
     <ClInclude Include="src\TypeChecker.h" />
   </ItemGroup>

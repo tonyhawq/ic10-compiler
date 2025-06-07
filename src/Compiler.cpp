@@ -1,9 +1,11 @@
 #include "Compiler.h"
 #include "Interpreter.h"
 #include "TypeChecker.h"
+#include "Timer.h"
 
 void Compiler::compile(const std::string& path)
 {
+	Timer timer;
 	std::ifstream file;
 	file.open(path.c_str());
 	if (!file.is_open())
@@ -13,14 +15,18 @@ void Compiler::compile(const std::string& path)
 	std::stringstream temp;
 	temp << file.rdbuf();
 	printf("Scanning...\n");
+	timer.start();
 	Scanner scanner(*this, temp.str());
 	std::vector<Token> tokens = scanner.scan();
+	printf("Scanning took %fms\n", timer.start() * 1000.0);
 	printf("Parsing...\n");
 	Parser parser(*this, std::move(tokens));
 	std::vector<std::unique_ptr<Stmt>> program = parser.parse();
+	printf("Parsing took %fms\n", timer.start() * 1000.0);
 	printf("Typechecking...\n");
 	TypeChecker checker(*this, std::move(program));
 	TypeCheckedProgram env = checker.check();
+	printf("Typing took %fms\n", timer.start() * 1000.0);
 	if (this->had_error)
 	{
 		printf("Aborting before code generation.\n");
@@ -29,6 +35,7 @@ void Compiler::compile(const std::string& path)
 	printf("Optimizing...\n");
 	Optimizer optimizer(*this, env);
 	optimizer.optimize();
+	printf("Optimizing took %fms\n", timer.start() * 1000.0);
 }
 
 void Compiler::error(int line, std::string message)
