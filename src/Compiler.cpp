@@ -1,6 +1,7 @@
 #include "Compiler.h"
 #include "Interpreter.h"
 #include "TypeChecker.h"
+#include "CodeGenerator.h"
 #include "Timer.h"
 
 void Compiler::compile(const std::string& path)
@@ -36,6 +37,14 @@ void Compiler::compile(const std::string& path)
 	Optimizer optimizer(*this, env);
 	optimizer.optimize();
 	printf("Optimizing took %fms\n", timer.start() * 1000.0);
+	printf("Generating code...\n");
+	CodeGenerator generator(*this, env);
+	std::string code = generator.generate();
+	printf("Code generation took %fms\n", timer.start() * 1000.0);
+	std::ofstream generated_file;
+	generated_file.open((path + ".ic10").c_str());
+	generated_file << code;
+	generated_file.close();
 }
 
 void Compiler::error(int line, std::string message)
