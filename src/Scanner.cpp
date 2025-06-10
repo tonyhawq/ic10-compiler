@@ -161,7 +161,7 @@ void Scanner::scan_string()
 		this->compiler.error(this->current_line, "Unterminated string found.");
 	}
 	this->advance();
-	std::string substr = this->source.substr(this->token_start, this->current_character - this->token_start);
+	std::string substr = this->source.substr(this->token_start + 1, this->current_character - this->token_start - 2);
 	this->add_token(TokenType::STRING, substr.c_str());
 }
 

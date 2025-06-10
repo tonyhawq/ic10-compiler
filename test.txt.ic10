@@ -20,7 +20,8 @@ pop ra
 pop r1
 sub r0 r0 r1
 push r0
-"stuff"
+peek r0
+s db Setting r0
 push ra
 jal 4
 pop ra
@@ -30,7 +31,8 @@ peek r1
 add sp sp 4
 sub r0 r0 r1
 push r0
-"stuff2"
+peek r0
+s db Setting r0
 push ra
 jal 4
 pop ra
@@ -53,7 +55,7 @@ add sp sp 6
 todo r0 r0 r1
 brgtz r0 0
 push ra
-jal 23
+jal 24
 pop ra
 pop r1
-j 33
+j 35
