@@ -4,6 +4,31 @@
 
 typedef std::shared_ptr<int> RegisterHandle;
 
+struct StackVariable
+{
+	std::string name;
+	int offset;
+	int size;
+};
+
+class StackEnvironment : public Environment<StackVariable>
+{
+public:
+	explicit StackEnvironment();
+	explicit StackEnvironment(StackEnvironment* parent);
+	virtual ~StackEnvironment();
+
+	void set_frame_size(int value);
+	int frame_size() const;
+
+	void define(const std::string& name, int size);
+	std::unique_ptr<StackVariable> resolve(const std::string& name);
+
+	StackEnvironment& spawn();
+private:
+	int m_frame_size;
+};
+
 class Register
 {
 public:
@@ -29,11 +54,9 @@ private:
 	std::vector<RegisterHandle> registers;
 };
 
-class CGEnvironment
+struct Placeholder
 {
-public:
-
-private:
+	int id;
 };
 
 class CodeGenerator : public Expr::Visitor, public Stmt::Visitor
@@ -44,7 +67,10 @@ public:
 
 	std::string generate();
 
-	RegisterHandle* visit(std::shared_ptr<Expr> expression);
+	std::unique_ptr<RegisterHandle> visit_expr_raw(std::shared_ptr<Expr> expression);
+	Register visit_expr(std::shared_ptr<Expr> expression);
+
+	void visit_stmt(std::unique_ptr<Stmt>& stmt);
 
 	virtual void* visitExprBinary(Expr::Binary& expr);
 	virtual void* visitExprGrouping(Expr::Grouping& expr);
@@ -65,13 +91,21 @@ public:
 	virtual void* visitStmtReturn(Stmt::Return& expr);
 	virtual void* visitStmtWhile(Stmt::While& expr);
 private:
+	std::string get_register_name(const Register& reg);
+
 	void emit_raw(const std::string& val);
 	void emit_register_use(const Register& reg);
 	void emit_register_use(const Register& a, const Register& b);
 	void emit_peek_stack_from_into(Register* reg);
+	void emit_load_into(int offset, const std::string& register_label);
+	void emit_load_into(int offset, Register* reg);
+	Placeholder emit_placeholder();
+	void emit_replace_placeholder(const Placeholder& placeholder, const std::string& val);
 
-	std::vector<CGEnvironment> stack;
-	int current_frame_sp;
+	int current_placeholder_value;
+	int current_line();
+
+	StackEnvironment env;
 	RegisterAllocator allocator;
 	std::string code;
 	Compiler& compiler;

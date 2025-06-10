@@ -170,7 +170,8 @@ public:
 	std::unique_ptr<TypeName> accept(Expr& expression);
 
 	static std::string get_mangled_function_name(const std::string& name, const std::vector<TypeID::FunctionParam> params, const TypeName& return_type);
-	static TypeName get_function_signature(const std::vector<TypeID::FunctionParam> params, const TypeName& return_type);
+	static TypeName get_function_signature(const std::vector<TypeID::FunctionParam>& params, const TypeName& return_type);
+	static TypeName get_function_signature(const std::vector<Stmt::Function::Param>& params, const TypeName& return_type);
 
 	virtual void* visitExprBinary(Expr::Binary& expr) override;
 	virtual void* visitExprGrouping(Expr::Grouping& expr) override;

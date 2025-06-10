@@ -2,84 +2,8 @@
 
 #include "Compiler.h"
 
-Environment Environment::make_orphaned()
-{
-	return Environment(nullptr);
-}
-
-Environment::Environment(Environment* parent)
-	:parent(parent), child(nullptr)
-{}
-
-Environment::VariableInfo* Environment::resolve(const std::string& name)
-{
-	if (this->variables.count(name))
-	{
-		return &this->variables.at(name);
-	}
-	if (this->parent)
-	{
-		return this->parent->resolve(name);
-	}
-	return nullptr;
-}
-
-bool Environment::define(const TypeName& type, const std::string& name)
-{
-	if (this->variables.count(name))
-	{
-		return false;
-	}
-	this->variables.emplace(name, VariableInfo{type, name});
-	return true;
-}
-
-Environment& Environment::spawn()
-{
-	if (this->child)
-	{
-		throw std::runtime_error("Attempted to create child of Environment which already has a child.");
-	}
-	this->child = new Environment(this);
-	this->child->function = this->function;
-	return *this->child;
-}
-
-Environment& Environment::spawn_inside_function(const std::string& function)
-{
-	Environment& spawned = this->spawn();
-	spawned.function = std::make_shared<std::string>(function);
-	return spawned;
-}
-
-bool Environment::inside_function()
-{
-	return this->function.get();
-}
-
-std::string* Environment::function_name()
-{
-	return this->function.get();
-}
-
-void Environment::kill()
-{
-	if (this->parent)
-	{
-		this->parent->child = nullptr;
-	}
-	delete this;
-}
-
-Environment* Environment::pop()
-{
-	Environment* parent = this->parent;
-	this->kill();
-	return parent;
-}
-
 Parser::Parser(Compiler& compiler, std::vector<Token> tokens)
-	:tokens(std::move(tokens)), compiler(compiler), current_token(0), environment(Environment::make_orphaned())
+	:tokens(std::move(tokens)), compiler(compiler), current_token(0)
 {}
 
 void Parser::synchronize()

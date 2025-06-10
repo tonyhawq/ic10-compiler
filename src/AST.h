@@ -7,8 +7,8 @@
 
 #define NODE_VISIT_IMPL(base_name, node_name) virtual void* accept(base_name::Visitor& visitor) override {return visitor.visit##base_name##node_name(*this);}
 
-constexpr const char* UNDEFINED_TYPE = "undefined";
-constexpr const char* VOID_TYPE = "void";
+#define UNDEFINED_TYPE TypeName("undefined")
+#define VOID_TYPE TypeName("void")
 
 struct TypeName
 {
@@ -65,6 +65,10 @@ struct Expr
 	bool is();
 
 	virtual void* accept(Visitor&) = 0;
+	
+	Expr(TypeName type) :type(type) {};
+	
+	TypeName type;
 };
 
 class Expr::Visitor
@@ -200,73 +204,65 @@ struct Stmt::Asm : public Stmt
 
 struct Expr::Logical : public Expr
 {
-	Logical(std::shared_ptr<Expr> left, Token op, std::shared_ptr<Expr> right) :left(left), op(op), right(right), type(UNDEFINED_TYPE) {};
+	Logical(std::shared_ptr<Expr> left, Token op, std::shared_ptr<Expr> right) :left(left), op(op), right(right), Expr(UNDEFINED_TYPE) {};
 	std::shared_ptr<Expr> left;
 	Token op;
 	std::shared_ptr<Expr> right;
-	TypeName type;
 	NODE_VISIT_IMPL(Expr, Logical)
 };
 
 struct Expr::Call : public Expr
 {
 	Call(std::shared_ptr<Expr> callee, const Token& paren, std::vector<std::shared_ptr<Expr>> arguments) :callee(callee), paren(paren), arguments(arguments),
-		type(UNDEFINED_TYPE) {};
+		Expr(UNDEFINED_TYPE) {};
 	std::shared_ptr<Expr> callee;
 	std::vector<std::shared_ptr<Expr>> arguments;
 	Token paren;
-	TypeName type;
 	NODE_VISIT_IMPL(Expr, Call)
 };
 
 struct Expr::Variable : public Expr
 {
-	Variable(const Token& name) :name(name), type(UNDEFINED_TYPE) {};
+	Variable(const Token& name) :name(name), Expr(UNDEFINED_TYPE) {};
 	Token name;
-	TypeName type;
 	NODE_VISIT_IMPL(Expr, Variable)
 };
 
 struct Expr::Assignment : public Expr
 {
-	Assignment(const Token& name, std::shared_ptr<Expr> value) :name(name), value(value), type(UNDEFINED_TYPE) {};
+	Assignment(const Token& name, std::shared_ptr<Expr> value) :name(name), value(value), Expr(UNDEFINED_TYPE) {};
 	std::shared_ptr<Expr> value;
 	Token name;
-	TypeName type;
 	NODE_VISIT_IMPL(Expr, Assignment)
 };
 
 struct Expr::Binary : public Expr
 {
-	Binary(std::shared_ptr<Expr> left, const Token& op, std::shared_ptr<Expr> right) :left(left), op(op), right(right), type(UNDEFINED_TYPE) {};
+	Binary(std::shared_ptr<Expr> left, const Token& op, std::shared_ptr<Expr> right) :left(left), op(op), right(right), Expr(UNDEFINED_TYPE) {};
 	std::shared_ptr<Expr> left;
 	Token op;
 	std::shared_ptr<Expr> right;
-	TypeName type;
 	NODE_VISIT_IMPL(Expr, Binary)
 };
 
 struct Expr::Grouping : public Expr
 {
-	Grouping(std::shared_ptr<Expr> expression) :expression(expression), type(UNDEFINED_TYPE) {};
+	Grouping(std::shared_ptr<Expr> expression) :expression(expression), Expr(UNDEFINED_TYPE) {};
 	std::shared_ptr<Expr> expression;
-	TypeName type;
 	NODE_VISIT_IMPL(Expr, Grouping)
 };
 
 struct Expr::Literal : public Expr
 {
-	Literal(const Token& literal) :literal(literal), type(UNDEFINED_TYPE) {};
+	Literal(const Token& literal) :literal(literal), Expr(UNDEFINED_TYPE) {};
 	Token literal;
-	TypeName type;
 	NODE_VISIT_IMPL(Expr, Literal)
 };
 
 struct Expr::Unary : public Expr
 {
-	Unary(const Token& op, std::shared_ptr<Expr> right) :op(op), right(right), type(UNDEFINED_TYPE) {};
+	Unary(const Token& op, std::shared_ptr<Expr> right) :op(op), right(right), Expr(UNDEFINED_TYPE) {};
 	Token op;
 	std::shared_ptr<Expr> right;
-	TypeName type;
 	NODE_VISIT_IMPL(Expr, Unary)
 };

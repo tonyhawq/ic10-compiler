@@ -976,7 +976,21 @@ std::string TypeChecker::get_mangled_function_name(const std::string& name, cons
 	return type_name;
 }
 
-TypeName TypeChecker::get_function_signature(const std::vector<TypeID::FunctionParam> params, const TypeName& return_type)
+TypeName TypeChecker::get_function_signature(const std::vector<Stmt::Function::Param>& params, const TypeName& return_type)
+{
+	std::vector<TypeID::FunctionParam> new_params;
+	new_params.reserve(params.size());
+	for (const auto& param : params)
+	{
+		new_params.push_back({
+			param.type,
+			param.name.lexeme
+			});
+	}
+	return TypeChecker::get_function_signature(new_params, return_type);
+}
+
+TypeName TypeChecker::get_function_signature(const std::vector<TypeID::FunctionParam>& params, const TypeName& return_type)
 {
 	std::string signature = "@function__";
 	if (params.size())
