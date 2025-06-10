@@ -104,8 +104,17 @@ struct Stmt
 	struct While;
 	class Visitor;
 
+	template <typename T>
+	bool is();
+
 	virtual void* accept(Stmt::Visitor&) = 0;
 };
+
+template <typename T>
+bool Stmt::is()
+{
+	return typeid(T).hash_code() == typeid(*this).hash_code();
+}
 
 class Stmt::Visitor
 {

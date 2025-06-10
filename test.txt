@@ -1,27 +1,38 @@
+ 
+number min = 0;
+number max = 10;
 
-number global = 0;
-
-function foo() -> const number
+function temp() -> number
 {
-	return global + 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9;
+	return 3;
 }
 
-function bar() -> const string*
+function heat() -> void
 {
-	return &"hello";
+	number to_heat = max - temp();
+	asm "peek r0";
+	asm "s db Setting r0";
 }
 
-function foobar() nodiscard -> number
+function cool() -> void
 {
-	return 0;
+	number to_cool = temp() - min;
+	asm "peek r0";
+	asm "s db Setting r0";
 }
 
 function main() -> void
 {
-	number val = foobar();
-	if (val > global)
+	while (true)
 	{
-		bar();
+		number temperature = temp();
+		if (temperature < min)
+		{
+			heat();
+		}
+		if (temperature > max)
+		{
+			cool();
+		}
 	}
-	return;
 }

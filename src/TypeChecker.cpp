@@ -16,6 +16,12 @@ std::string& TypeID::unmangled_name()
 	return *this->m_unmangled_name;
 }
 
+std::string& TypeID::mangled_name()
+{
+	CHECK_IS_FUNCTION_OR_ERROR("MANGLED_NAME");
+	return *this->m_mangled_name;
+}
+
 std::vector<TypeID::FunctionParam>& TypeID::arguments()
 {
 	CHECK_IS_FUNCTION_OR_ERROR("ARGUMENTS");
@@ -34,11 +40,40 @@ const std::string& TypeID::unmangled_name() const
 	return *this->m_unmangled_name;
 }
 
+const std::string& TypeID::mangled_name() const
+{
+	CHECK_IS_FUNCTION_OR_ERROR("MANGLED_NAME");
+	return *this->m_mangled_name;
+}
+
 const std::vector<TypeID::FunctionParam>& TypeID::arguments() const
 {
 	CHECK_IS_FUNCTION_OR_ERROR("ARGUMENTS");
 	return *this->m_arguments;
 }
+
+TypeID::TypeID(const TypeName& type)
+	:type(type), is_function(false), m_return_type(nullptr), m_unmangled_name(nullptr), m_mangled_name(nullptr)
+{}
+
+TypeID::TypeID(const TypeName& type, bool is_function, std::unique_ptr<TypeName> return_type, std::unique_ptr<std::string> m_unmangled_name, std::unique_ptr<std::vector<FunctionParam>> m_arguments)
+	:type(type), is_function(is_function), m_return_type(std::move(return_type)),
+	m_unmangled_name(std::move(m_unmangled_name)), m_arguments(std::move(m_arguments))
+{
+	if (this->is_function)
+	{
+		m_mangled_name = std::make_unique<std::string>(TypeChecker::get_mangled_function_name(this->unmangled_name(), this->arguments(), this->return_type()));
+	}
+}
+
+
+TypeID::TypeID(const TypeID& other)
+	:type(other.type), is_function(other.is_function),
+	m_return_type(other.m_return_type ? std::make_unique<TypeName>(*other.m_return_type) : nullptr),
+	m_unmangled_name(other.m_unmangled_name ? std::make_unique<std::string>(*other.m_unmangled_name) : nullptr),
+	m_arguments(other.m_arguments ? std::make_unique<std::vector<FunctionParam>>(*other.m_arguments) : nullptr),
+	m_mangled_name(other.m_mangled_name ? std::make_unique<std::string>(*other.m_mangled_name) : nullptr)
+{}
 
 Identifier::Identifier(const std::string& name)
 	:m_name(name)
@@ -54,11 +89,16 @@ std::string Identifier::name() const
 	return this->m_name;
 }
 
-Variable::Variable(const Identifier& identifier, const TypeName& type)
+Variable::Variable(const Identifier& identifier, const TypeID& type)
 	:m_identifier(identifier), m_type(type)
 {}
 
 const TypeName& Variable::type() const
+{
+	return this->m_type.type;
+}
+
+const TypeID& Variable::full_type() const
 {
 	return this->m_type;
 }
@@ -151,7 +191,7 @@ const std::string* TypedEnvironment::Leaf::function() const
 	return this->m_function_name.get();
 }
 
-bool TypedEnvironment::Leaf::define_variable(const TypeName& type, const Identifier& identifier)
+bool TypedEnvironment::Leaf::define_variable(const TypeID& type, const Identifier& identifier)
 {
 	const auto& var = this->m_variables.find(identifier);
 	if (var != this->m_variables.end())
@@ -384,11 +424,11 @@ TypeChecker::TypeChecker(Compiler& compiler, std::vector<std::unique_ptr<Stmt>> 
 	TypeName t_Device("Device");
 	TypeName t_boolean("boolean");
 	TypeName t_void("void");
-	this->types.emplace(t_number, TypeID{ t_number, false, nullptr, nullptr });
-	this->types.emplace(t_string, TypeID{ t_string, false, nullptr, nullptr });
-	this->types.emplace(t_Device, TypeID{ t_Device, false, nullptr, nullptr });
-	this->types.emplace(t_boolean, TypeID{ t_boolean, false, nullptr, nullptr });
-	this->types.emplace(t_void, TypeID{ t_void, false, nullptr, nullptr });
+	this->types.emplace(t_number, TypeID{ t_number, false, nullptr, nullptr, nullptr });
+	this->types.emplace(t_string, TypeID{ t_string, false, nullptr, nullptr, nullptr });
+	this->types.emplace(t_Device, TypeID{ t_Device, false, nullptr, nullptr, nullptr });
+	this->types.emplace(t_boolean, TypeID{ t_boolean, false, nullptr, nullptr, nullptr });
+	this->types.emplace(t_void, TypeID{ t_void, false, nullptr, nullptr, nullptr });
 	
 	this->define_operator(TokenType::GREATER, "op_greater", {
 		new OperatorOverload{t_boolean, {t_number, t_number}}
@@ -460,14 +500,15 @@ void TypeChecker::define_library_function(const std::string& name, const TypeNam
 		params.push_back({ arg_type, "_" });
 	}
 	TypeName type = TypeChecker::get_function_signature(params, return_type);
-	this->env->define_variable(type, name);
-	this->types.emplace(type, TypeID{
+	TypeID type_id(
 		type,
 		true,
-		std::make_unique<TypeName>(return_type),
-		std::make_unique<std::string>(name),
-		std::make_unique<std::vector<TypeID::FunctionParam>>(std::move(params))
-	});
+		std::move(std::make_unique<TypeName>(return_type)),
+		std::move(std::make_unique<std::string>(name)),
+		std::move(std::make_unique<std::vector<TypeID::FunctionParam>>(std::move(params)))
+		);
+	this->env->define_variable(type_id, name);
+	this->types.emplace(type, type_id);
 }
 
 TypeCheckedProgram TypeChecker::check()
@@ -476,6 +517,10 @@ TypeCheckedProgram TypeChecker::check()
 	this->evaluate(this->program.statements());
 	this->current_pass = Pass::TypeChecking;
 	this->evaluate(this->program.statements());
+	if (!this->seen_main)
+	{
+		this->error(Token(-1, TokenType::T_EOF, "\n", nullptr), "No entry point.");
+	}
 	return std::move(this->program);
 }
 
@@ -674,6 +719,7 @@ void* TypeChecker::visitExprCall(Expr::Call& expr)
 		this->error(expr.paren, std::string("Attempted to call a non-function type."));
 		return nullptr;
 	}
+	expr.callee->type = function_type.type;
 	bool had_error = false;
 	for (int i = 0; i < std::max(expr.arguments.size(), function_type.arguments().size()); i++)
 	{
@@ -781,7 +827,7 @@ void* TypeChecker::visitStmtVariable(Stmt::Variable& stmt)
 		this->error(stmt.name, std::string("Attempted to declare variable ") + stmt.name.lexeme + " as void.");
 		return nullptr;
 	}
-	bool success = this->env->define_variable(stmt.type, stmt.name.lexeme);
+	bool success = this->env->define_variable(TypeID(stmt.type), stmt.name.lexeme);
 	if (!stmt.initalizer)
 	{
 		this->error(stmt.name, std::string("Variable ") + stmt.name.lexeme + " is uninitalized.");
@@ -901,6 +947,7 @@ void* TypeChecker::visitStmtFunction(Stmt::Function& expr)
 	{
 		if (expr.name.lexeme == "main")
 		{
+			this->seen_main = true;
 			// main function
 			if (expr.params.size())
 			{
@@ -918,15 +965,18 @@ void* TypeChecker::visitStmtFunction(Stmt::Function& expr)
 			const Token& param_name = param.name;
 			args.push_back({ param_type, param_name.lexeme });
 		}
+
 		TypeName function_type = this->get_function_signature(args, expr.return_type);
-		bool success = this->env->define_variable(function_type, expr.name.lexeme);
-		this->types.emplace(function_type, TypeID{
+		TypeID function_type_id(
 			function_type,
 			true,
 			std::make_unique<TypeName>(expr.return_type),
 			std::make_unique<std::string>(expr.name.lexeme),
 			std::make_unique<std::vector<TypeID::FunctionParam>>(args)
-			});
+		);
+
+		bool success = this->env->define_variable(function_type_id, expr.name.lexeme);
+		this->types.emplace(function_type, function_type_id);
 		if (!success)
 		{
 			this->error(expr.name, std::string("Redefining function ") + expr.name.lexeme);
@@ -949,7 +999,7 @@ void* TypeChecker::visitStmtFunction(Stmt::Function& expr)
 		}
 		else
 		{
-			this->env->define_variable(param_type, param_name.lexeme);
+			this->env->define_variable(TypeID(param_type), param_name.lexeme);
 		}
 	}
 	if (!this->types.count(expr.return_type.underlying()))

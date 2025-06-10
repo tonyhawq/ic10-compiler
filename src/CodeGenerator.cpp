@@ -10,7 +10,7 @@ std::unique_ptr<StackVariable> StackEnvironment::resolve(const std::string& name
 	}
 	if (this->parent)
 	{
-		std::unique_ptr<StackVariable> var = dynamic_cast<StackEnvironment*>(this->parent)->resolve(name);
+		std::unique_ptr<StackVariable> var = this->parent->resolve(name);
 		var->offset += this->m_frame_size;
 		return var;
 	}
@@ -18,15 +18,24 @@ std::unique_ptr<StackVariable> StackEnvironment::resolve(const std::string& name
 }
 
 StackEnvironment::StackEnvironment()
-	:Environment<StackVariable>(Environment::make_orphaned()), m_frame_size(0)
+	:m_frame_size(0), m_function_name(nullptr), parent(nullptr), child(nullptr)
 {}
 
 StackEnvironment::StackEnvironment(StackEnvironment* parent)
-	:Environment<StackVariable>(parent), m_frame_size(0)
+	:m_frame_size(0), m_function_name(nullptr), parent(parent), child(nullptr)
 {}
 
 StackEnvironment::~StackEnvironment()
-{}
+{
+	if (child)
+	{
+		delete child;
+	}
+	if (parent)
+	{
+		parent->child = nullptr;
+	}
+}
 
 void StackEnvironment::define(const std::string& name, int size)
 {
@@ -34,7 +43,7 @@ void StackEnvironment::define(const std::string& name, int size)
 	{
 		var.second.offset += size;
 	}
-	this->Environment::define(name, { name, 0, size });
+	this->variables.emplace(name, StackVariable{ name, 0, size });
 	this->m_frame_size += size;
 }
 
@@ -48,16 +57,69 @@ int StackEnvironment::frame_size() const
 	return this->m_frame_size;
 }
 
-StackEnvironment& StackEnvironment::spawn()
+StackEnvironment* StackEnvironment::spawn()
+{
+	StackEnvironment* env = new StackEnvironment(this);
+	this->child = env;
+	return env;
+}
+
+StackEnvironment* StackEnvironment::spawn_in_function(const std::string& name)
 {
 	if (this->child)
 	{
-		throw std::runtime_error("Attempted to create child of Environment which already has a child.");
+		throw std::runtime_error("Attempted to spawn while having a child.");
 	}
-	this->child = new StackEnvironment(this);
-	StackEnvironment* derived = dynamic_cast<StackEnvironment*>(this->child);
-	derived->function = this->function;
-	return *derived;
+	StackEnvironment* child = new StackEnvironment(this);
+	this->child = child;
+	child->m_function_name = std::make_unique<std::string>(name);
+	return child;
+}
+
+StackEnvironment* StackEnvironment::pop()
+{
+	if (!this->parent)
+	{
+		throw std::runtime_error("Cannot pop top-level environment");
+	}
+	StackEnvironment* parent = this->parent;
+	delete parent->child;
+	return parent;
+}
+
+StackEnvironment* StackEnvironment::pop_to_function()
+{
+	if (!parent)
+	{
+		throw std::runtime_error("Cannot pop top-level environment");
+	}
+	StackEnvironment* parent = this;
+	while (!parent->m_function_name)
+	{
+		parent = parent->parent;
+		if (!parent)
+		{
+			throw std::runtime_error("Attempted to call StackEnvironment::pop_to_function() from an environment that is not inside a function.");
+		}
+	}
+	if (parent->child)
+	{
+		delete parent->child;
+	}
+	return parent;
+}
+
+StackEnvironment& StackEnvironment::operator=(StackEnvironment&& other) noexcept
+{
+	if (this != &other)
+	{
+		this->m_frame_size = other.m_frame_size;
+		this->parent = std::move(other.parent);
+		this->child = std::move(other.child);
+		this->variables = std::move(other.variables);
+		this->m_function_name = std::move(other.m_function_name);
+	}
+	return *this;
 }
 
 Register::Register(RegisterHandle handle)
@@ -108,8 +170,10 @@ Register RegisterAllocator::allocate()
 }
 
 CodeGenerator::CodeGenerator(Compiler& compiler, TypeCheckedProgram& program)
-	:compiler(compiler), m_program(program), allocator(16)
-{}
+	:compiler(compiler), m_program(program), allocator(16), top_env(), env(nullptr), current_placeholder_value(0)
+{
+	this->env = &top_env;
+}
 
 void CodeGenerator::error(const Token& token, const std::string& str)
 {
@@ -117,16 +181,61 @@ void CodeGenerator::error(const Token& token, const std::string& str)
 	throw CodeGenerationError();
 }
 
+void CodeGenerator::push_env()
+{
+	this->env = this->env->spawn();
+}
+
+void CodeGenerator::push_env(const std::string& name)
+{
+	this->env = this->env->spawn_in_function(name);
+}
+
+void CodeGenerator::pop_env()
+{
+	this->env = this->env->pop();
+}
+
+static void find_and_replace_in(std::string& str, const std::string& replace, const std::string& with)
+{
+	size_t found = 0;
+	while ((found = str.find(replace, found)) != std::string::npos)
+	{
+		str.replace(found, replace.length(), with);
+		found += with.length();
+	}
+}
+
 std::string CodeGenerator::generate()
 {
 	try
 	{
+		for (auto& stmt : this->m_program.statements())
+		{
+			this->visit_stmt(stmt);
+		}
 	}
-	catch (CodeGenerationError)
+	catch (std::exception& e)
+	{
+		this->compiler.error(-1, e.what());
+	}
+	catch(CodeGenerationError& e)
 	{
 		this->compiler.error(-1, "Error detected, aborting code generation.");
 		return "";
 	}
+	size_t found = 0;
+	while ((found = this->code.find("\n@function", found)) != std::string::npos)
+	{
+		found = found + 1;
+		size_t end = this->code.find(':', found);
+		std::string identifier = this->code.substr(found, end - found);
+		printf("%s\n", identifier.c_str());
+		this->code.erase(found, end - found + 1);
+		int line = std::count(this->code.begin(), this->code.begin() + found, '\n');
+		find_and_replace_in(this->code, identifier, std::to_string(line));
+	}
+	return std::move(this->code);
 }
 
 void CodeGenerator::emit_raw(const std::string& val)
@@ -209,6 +318,18 @@ void* CodeGenerator::visitExprBinary(Expr::Binary& expr)
 	case TokenType::SLASH:
 		this->emit_raw("div ");
 		break;
+	case TokenType::GREATER:
+		this->emit_raw("todo ");
+		break;
+	case TokenType::LESS:
+		this->emit_raw("todo ");
+		break;
+	case TokenType::GREATER_EQUAL:
+		this->emit_raw("todo ");
+		break;
+	case TokenType::LESS_EQUAL:
+		this->emit_raw("todo ");
+		break;
 	default:
 		throw std::runtime_error("Binary operation had non +-*/ type.");
 	}
@@ -282,6 +403,13 @@ std::string CodeGenerator::get_register_name(const Register& reg)
 
 void CodeGenerator::emit_load_into(int offset, const std::string& register_label)
 {
+	if (offset == 0)
+	{
+		this->emit_raw("peek ");
+		this->emit_raw(register_label);
+		this->emit_raw("\n");
+		return;
+	}
 	this->emit_raw("sub sp sp ");
 	this->emit_raw(std::to_string(offset));
 	this->emit_raw("\n");
@@ -290,6 +418,7 @@ void CodeGenerator::emit_load_into(int offset, const std::string& register_label
 	this->emit_raw("\n");
 	this->emit_raw("add sp sp ");
 	this->emit_raw(std::to_string(offset));
+	this->emit_raw("\n");
 }
 
 void CodeGenerator::emit_load_into(int offset, Register* reg)
@@ -300,7 +429,7 @@ void CodeGenerator::emit_load_into(int offset, Register* reg)
 void* CodeGenerator::visitExprVariable(Expr::Variable& expr)
 {
 	Register reg = this->allocator.allocate();
-	std::unique_ptr<StackVariable> var = this->env.resolve(expr.name.lexeme);
+	std::unique_ptr<StackVariable> var = this->env->resolve(expr.name.lexeme);
 	if (!var)
 	{
 		throw std::runtime_error("Attempt to use undefined variable.");
@@ -312,10 +441,26 @@ void* CodeGenerator::visitExprVariable(Expr::Variable& expr)
 void* CodeGenerator::visitExprAssignment(Expr::Assignment& expr)
 {
 	
+
+	return nullptr;
 }
 
 void* CodeGenerator::visitExprCall(Expr::Call& expr)
 {
+	std::string name;
+	if (expr.callee->is<Expr::Variable>())
+	{
+		const Variable* var = this->m_program.env().root()->get_variable(dynamic_cast<Expr::Variable*>(expr.callee.get())->name.lexeme);
+		if (!var)
+		{
+			throw std::runtime_error("Attempted to call a non-existent function.");
+		}
+		name = var->full_type().mangled_name();
+	}
+	else
+	{
+		throw std::runtime_error("Non-static functions not implemented yet.");
+	}
 	for (auto& arg : expr.arguments)
 	{
 		Register loaded = this->visit_expr(arg);
@@ -326,7 +471,7 @@ void* CodeGenerator::visitExprCall(Expr::Call& expr)
 	this->emit_raw("push ra\n");
 
 	this->emit_raw("jal ");
-	this->emit_raw(expr.callee->type.type_name());
+	this->emit_raw(name);
 	this->emit_raw("\n");
 
 	this->emit_raw("pop ra\n");
@@ -406,19 +551,19 @@ void* CodeGenerator::visitStmtVariable(Stmt::Variable& expr)
 	this->emit_register_use(value);
 	this->emit_raw("\n");
 
-	this->env.define(expr.name.lexeme, 1);
+	this->env->define(expr.name.lexeme, 1);
 
 	return nullptr;
 }
 
 void* CodeGenerator::visitStmtBlock(Stmt::Block& expr)
 {
-	this->env.spawn();
+	this->push_env();
 	for (auto& stmt : expr.statements)
 	{
 		this->visit_stmt(stmt);
 	}
-	this->env.pop();
+	this->pop_env();
 
 	return nullptr;
 }
@@ -446,7 +591,7 @@ void CodeGenerator::emit_replace_placeholder(const Placeholder& placeholder, con
 
 int CodeGenerator::current_line()
 {
-	return std::count(this->code.begin(), this->code.end(), '\n');
+	return static_cast<int>(std::count(this->code.begin(), this->code.end(), '\n'));
 }
 
 void* CodeGenerator::visitStmtIf(Stmt::If& expr)
@@ -455,6 +600,7 @@ void* CodeGenerator::visitStmtIf(Stmt::If& expr)
 	
 	this->emit_raw("brgtz ");
 	this->emit_register_use(value);
+	this->emit_raw(" ");
 	Placeholder placeholder = this->emit_placeholder();
 	this->emit_raw("\n");
 
@@ -474,36 +620,46 @@ void* CodeGenerator::visitStmtIf(Stmt::If& expr)
 void* CodeGenerator::visitStmtFunction(Stmt::Function& expr)
 {
 	// function definitons are only on top level
-	this->emit_raw(TypeChecker::get_function_signature(expr.params, expr.return_type).type_name());
-	this->emit_raw(":\n");
-	this->env.spawn();
+	std::string name = this->m_program.env().root()->get_variable(expr.name.lexeme)->full_type().mangled_name();
+
+	this->emit_raw(name);
+	this->emit_raw(":");
+	this->push_env(name);
 	for (const auto& param : expr.params)
 	{
-		this->env.define(param.name.lexeme, 1);
+		this->env->define(param.name.lexeme, 1);
 	}
 	// return address
-	this->env.define("@return", 1);
+	this->env->define("@return", 1);
 	for (auto& stmt : expr.body)
 	{
 		this->visit_stmt(stmt);
 	}
-	this->env.pop();
 
 	return nullptr;
 }
 
 void* CodeGenerator::visitStmtReturn(Stmt::Return& expr)
 {
-	std::unique_ptr<StackVariable> return_address_offset = this->env.resolve("@return");
+	std::unique_ptr<StackVariable> return_address_offset = this->env->resolve("@return");
 	if (!return_address_offset)
 	{
 		throw std::runtime_error("Attempted to return without a return address being defined.");
 	}
+	
+	this->emit_raw("#loading return address from stack\n");
 	Register return_address = this->allocator.allocate();
 	this->emit_load_into(return_address_offset->offset, &return_address);
-	this->emit_raw("sub sp sp ");
-	this->emit_raw(std::to_string(this->env.frame_size()));
+	
+	this->emit_raw("#clearing stack\n");
+	if (this->env->frame_size() > 0)
+	{
+		this->emit_raw("sub sp sp ");
+		this->emit_raw(std::to_string(this->env->frame_size()));
+		this->emit_raw("\n");
+	}
 
+	this->emit_raw("#pushing return value\n");
 	if (expr.value)
 	{
 		Register value = this->visit_expr(expr.value);
@@ -521,8 +677,8 @@ void* CodeGenerator::visitStmtReturn(Stmt::Return& expr)
 	this->emit_raw("\n");
 	this->emit_raw("j ra\n");
 
-	this->env.pop_to_function();
-	this->env.pop();
+	this->env = this->env->pop_to_function();
+	this->pop_env();
 
 	return nullptr;
 }

@@ -1,0 +1,59 @@
+move r0 0.000000
+push r0
+move r0 10.000000
+push r0
+#loading return address from stack
+peek r0
+#clearing stack
+sub sp sp 1
+#pushing return value
+move r1 3.000000
+push r1
+push r0
+j ra
+sub sp sp 1
+peek r0
+add sp sp 1
+push ra
+jal 4
+pop ra
+pop r1
+sub r0 r0 r1
+push r0
+"stuff"
+push ra
+jal 4
+pop ra
+pop r0
+sub sp sp 4
+peek r1
+add sp sp 4
+sub r0 r0 r1
+push r0
+"stuff2"
+push ra
+jal 4
+pop ra
+pop r0
+push r0
+peek r0
+sub sp sp 7
+peek r1
+add sp sp 7
+todo r0 r0 r1
+brgtz r0 0
+push ra
+jal 13
+pop ra
+pop r1
+peek r0
+sub sp sp 6
+peek r1
+add sp sp 6
+todo r0 r0 r1
+brgtz r0 0
+push ra
+jal 23
+pop ra
+pop r1
+j 33

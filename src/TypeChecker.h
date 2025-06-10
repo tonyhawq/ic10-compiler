@@ -13,17 +13,24 @@ class Compiler;
 struct TypeID
 {
 	struct FunctionParam;
+	
+	explicit TypeID(const TypeName& type);
+	TypeID(const TypeName& type, bool is_function, std::unique_ptr<TypeName> return_type, std::unique_ptr<std::string> m_unmangled_name, std::unique_ptr<std::vector<FunctionParam>> m_arguments);
+	explicit TypeID(const TypeID& other);
 
 	TypeName type;
 	TypeName& return_type();
+	std::string& mangled_name();
 	std::string& unmangled_name();
 	std::vector<FunctionParam>& arguments();
 	const TypeName& return_type() const;
+	const std::string& mangled_name() const;
 	const std::string& unmangled_name() const;
 	const std::vector<FunctionParam>& arguments() const;
 
 	bool is_function = false;
 	std::unique_ptr<TypeName> m_return_type;
+	std::unique_ptr<std::string> m_mangled_name;
 	std::unique_ptr<std::string> m_unmangled_name;
 	std::unique_ptr<std::vector<FunctionParam>> m_arguments;
 };
@@ -58,13 +65,14 @@ namespace std {
 class Variable
 {
 public:
-	Variable(const Identifier& identifier, const TypeName& type);
+	Variable(const Identifier& identifier, const TypeID& type);
 
 	const TypeName& type() const;
+	const TypeID& full_type() const;
 	const Identifier& identifier() const;
 private:
 	Identifier m_identifier;
-	TypeName m_type;
+	TypeID m_type;
 };
 
 class TypedEnvironment
@@ -103,7 +111,7 @@ public:
 	size_t leaf_id() const;
 
 	const std::string* function() const;
-	bool define_variable(const TypeName& type, const Identifier& identifier);
+	bool define_variable(const TypeID& type, const Identifier& identifier);
 	enum class LongerLived
 	{
 		A,
@@ -191,6 +199,8 @@ public:
 	virtual void* visitStmtFunction(Stmt::Function& expr) override;
 	virtual void* visitStmtReturn(Stmt::Return& expr) override;
 private:
+	bool seen_main = false;
+
 	TypeCheckedProgram program;
 	TypedEnvironment::Leaf* env;
 

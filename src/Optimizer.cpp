@@ -274,6 +274,7 @@ void* Optimizer::visitStmtIf(Stmt::If& stmt)
 
 void* Optimizer::visitStmtFunction(Stmt::Function& expr)
 {
+	// todo: fold/inline functions
 	this->evaluate(expr.body);
 	return nullptr;
 }

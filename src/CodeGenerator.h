@@ -11,12 +11,16 @@ struct StackVariable
 	int size;
 };
 
-class StackEnvironment : public Environment<StackVariable>
+class StackEnvironment
 {
 public:
 	explicit StackEnvironment();
 	explicit StackEnvironment(StackEnvironment* parent);
-	virtual ~StackEnvironment();
+	~StackEnvironment();
+	StackEnvironment(StackEnvironment&& other) noexcept = default;
+	StackEnvironment(const StackEnvironment& other) = delete;
+	StackEnvironment& operator=(const StackEnvironment& other) = delete;
+	StackEnvironment& operator=(StackEnvironment&& other)  noexcept;
 
 	void set_frame_size(int value);
 	int frame_size() const;
@@ -24,8 +28,15 @@ public:
 	void define(const std::string& name, int size);
 	std::unique_ptr<StackVariable> resolve(const std::string& name);
 
-	StackEnvironment& spawn();
+	StackEnvironment* pop_to_function();
+	StackEnvironment* spawn();
+	StackEnvironment* spawn_in_function(const std::string& name);
+	StackEnvironment* pop();
 private:
+	StackEnvironment* child;
+	StackEnvironment* parent;
+	std::unique_ptr<std::string> m_function_name;
+	std::unordered_map<std::string, StackVariable> variables;
 	int m_frame_size;
 };
 
@@ -105,7 +116,12 @@ private:
 	int current_placeholder_value;
 	int current_line();
 
-	StackEnvironment env;
+	void push_env();
+	void push_env(const std::string& name);
+	void pop_env();
+
+	StackEnvironment* env;
+	StackEnvironment top_env;
 	RegisterAllocator allocator;
 	std::string code;
 	Compiler& compiler;
