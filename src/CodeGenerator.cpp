@@ -250,6 +250,8 @@ std::string CodeGenerator::generate()
 		this->emit_raw("\n");
 		this->emit_raw("jr -1\n");
 
+		printf("entering function linkage\n");
+
 		this->pass = Pass::FunctionLinkage;
 		for (auto& stmt : this->m_program.statements())
 		{
@@ -520,9 +522,6 @@ void* CodeGenerator::visitStmtReturn(Stmt::Return& expr)
 	this->comment("return statement for ");
 	this->comment(this->env->function_name().substr(sizeof("@function")));
 
-	int return_address_offset = this->env->resolve("@return")->offset;
-	this->emit_load_into(return_address_offset, "ra");
-
 	std::unique_ptr<Register> return_value;
 
 	// push return value
@@ -530,6 +529,9 @@ void* CodeGenerator::visitStmtReturn(Stmt::Return& expr)
 	{
 		return_value = std::make_unique<Register>(this->visit_expr(expr.value));
 	}
+
+	int return_address_offset = this->env->resolve("@return")->offset;
+	this->emit_load_into(return_address_offset, "ra");
 
 	StackEnvironment* env_to_pop = this->env;
 	int stack_values_to_pop = 0;
@@ -670,12 +672,14 @@ void CodeGenerator::visit_stmt(std::unique_ptr<Stmt>& stmt)
 	{
 		if (typeid(*stmt) == typeid(Stmt::Variable))
 		{
+			printf("accepting variable decl\n");
 			stmt->accept(*this);
 		}
 		return;
 	}
 	if (this->pass == Pass::FunctionLinkage)
 	{
+		printf("accepting any stmt\n");
 		if (!this->env->is_in_function() && typeid(*stmt) == typeid(Stmt::Variable))
 		{
 			return;
@@ -732,6 +736,7 @@ void* CodeGenerator::visitStmtBlock(Stmt::Block& expr)
 	for (auto& stmt : expr.statements)
 	{
 		this->visit_stmt(stmt);
+		// no need to emit code after a return statement (will never be executed)
 		if (stmt->is<Stmt::Return>())
 		{
 			return nullptr;
@@ -792,8 +797,6 @@ void* CodeGenerator::visitStmtIf(Stmt::If& expr)
 	this->visit_stmt(expr.branch_true);
 	int jump_length = this->current_line() - length_before;
 	this->emit_replace_placeholder(placeholder, std::to_string(jump_length));
-
-	this->visit_stmt(expr.branch_true);
 
 	return nullptr;
 }

@@ -97,14 +97,6 @@ std::unique_ptr<Stmt> Parser::parse_function_declaration()
 	TypeName return_type = this->parse_type();
 	consume(TokenType::LEFT_BRACE, "Expected { before function body.");
 	std::unique_ptr<Stmt::Block> body(dynamic_cast<Stmt::Block*>(this->parse_block().release()));
-	if (body->statements.size() == 0)
-	{
-		body->statements.push_back(std::make_unique<Stmt::Return>(body->right_brace, nullptr));
-	}
-	else if (!body->statements.at(body->statements.size() - 1)->is<Stmt::Return>())
-	{
-		body->statements.push_back(std::make_unique<Stmt::Return>(body->right_brace, nullptr));
-	}
 	return std::make_unique<Stmt::Function>(name, std::move(return_type), params, std::move(body->statements));
 }
 
@@ -304,6 +296,7 @@ std::unique_ptr<Stmt> Parser::parse_if()
 std::unique_ptr<Stmt> Parser::parse_block()
 {
 	std::vector<std::unique_ptr<Stmt>> statements;
+	bool seen_return = false;
 	while (!this->current_token_is(TokenType::RIGHT_BRACE) && !this->is_eof())
 	{
 		std::unique_ptr<Stmt> statement = this->parse_declaration();
