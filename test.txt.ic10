@@ -10,7 +10,7 @@ peek r0
 add sp sp 1
 move r1 2.000000
 slt r0 r0 r1
-breqz r0 9
+breqz r0 10
 #return statement for 
 #fib_return_number_params_@number_n
 sub sp sp 1

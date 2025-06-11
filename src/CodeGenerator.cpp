@@ -783,20 +783,48 @@ void* CodeGenerator::visitStmtIf(Stmt::If& expr)
 {
 	Register value = this->visit_expr(expr.condition);
 	
+	/*
+
+	if == 0 goto label:
+
+	// true branch
+
+	j label + false_length
+
+	label:
+	
+	// false branch
+
+	// final
+
+	*/
+
 	this->emit_raw("breqz ");
 	this->emit_register_use(value);
 	this->emit_raw(" ");
 	Placeholder placeholder = this->emit_placeholder();
 	this->emit_raw("\n");
 
-	int length_before = this->current_line();
+	int true_branch_length = this->current_line();
+	this->visit_stmt(expr.branch_true);
+	std::unique_ptr<Placeholder> jump_over_false;
 	if (expr.branch_false)
 	{
-		this->visit_stmt(expr.branch_false);
+		this->emit_raw("jr ");
+		jump_over_false = std::make_unique<Placeholder>(this->emit_placeholder());
+		this->emit_raw("\n");
 	}
-	this->visit_stmt(expr.branch_true);
-	int jump_length = this->current_line() - length_before;
-	this->emit_replace_placeholder(placeholder, std::to_string(jump_length));
+
+	true_branch_length = this->current_line() - true_branch_length;
+	this->emit_replace_placeholder(placeholder, std::to_string(true_branch_length + 1));
+
+	if (expr.branch_false)
+	{
+		int false_branch_length = this->current_line();
+		this->visit_stmt(expr.branch_false);
+		false_branch_length = this->current_line() - false_branch_length;
+		this->emit_replace_placeholder(*jump_over_false, std::to_string(false_branch_length + 1));
+	}
 
 	return nullptr;
 }
