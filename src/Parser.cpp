@@ -97,6 +97,14 @@ std::unique_ptr<Stmt> Parser::parse_function_declaration()
 	TypeName return_type = this->parse_type();
 	consume(TokenType::LEFT_BRACE, "Expected { before function body.");
 	std::unique_ptr<Stmt::Block> body(dynamic_cast<Stmt::Block*>(this->parse_block().release()));
+	if (body->statements.size() == 0)
+	{
+		body->statements.push_back(std::make_unique<Stmt::Return>(body->right_brace, nullptr));
+	}
+	else if (!body->statements.at(body->statements.size() - 1)->is<Stmt::Return>())
+	{
+		body->statements.push_back(std::make_unique<Stmt::Return>(body->right_brace, nullptr));
+	}
 	return std::make_unique<Stmt::Function>(name, std::move(return_type), params, std::move(body->statements));
 }
 
@@ -232,7 +240,7 @@ std::unique_ptr<Stmt> Parser::parse_for_statement()
 	{
 		increment = this->parse_expression();
 	}
-	this->consume(TokenType::RIGHT_PAREN, "Expected ) following for header");
+	const Token& right_paren = this->consume(TokenType::RIGHT_PAREN, "Expected ) following for header");
 	std::unique_ptr<Stmt> body = this->parse_statement();
 
 	if (increment)
@@ -240,7 +248,7 @@ std::unique_ptr<Stmt> Parser::parse_for_statement()
 		std::vector<std::unique_ptr<Stmt>> new_body; 
 		new_body.push_back(std::move(body));
 		new_body.push_back(std::make_unique<Stmt::Expression>(increment));
-		body = std::make_unique<Stmt::Block>(std::move(new_body));
+		body = std::make_unique<Stmt::Block>(std::move(new_body), right_paren);
 	}
 	if (!condition)
 	{
@@ -252,7 +260,7 @@ std::unique_ptr<Stmt> Parser::parse_for_statement()
 		std::vector<std::unique_ptr<Stmt>> new_body;
 		new_body.push_back(std::move(initalizer));
 		new_body.push_back(std::move(body));
-		body = std::make_unique<Stmt::Block>(std::move(new_body));
+		body = std::make_unique<Stmt::Block>(std::move(new_body), right_paren);
 	}
 	return body;
 }
@@ -304,8 +312,8 @@ std::unique_ptr<Stmt> Parser::parse_block()
 			statements.push_back(std::move(statement));
 		}
 	}
-	this->consume(TokenType::RIGHT_BRACE, "Expected } after block.");
-	return std::make_unique<Stmt::Block>(std::move(statements));
+	const Token& right_brace = this->consume(TokenType::RIGHT_BRACE, "Expected } after block.");
+	return std::make_unique<Stmt::Block>(std::move(statements), right_brace);
 }
 
 std::unique_ptr<Stmt> Parser::parse_print_statement()

@@ -1,61 +1,90 @@
 move r0 0.000000
 push r0
-move r0 10.000000
-push r0
-#loading return address from stack
-peek r0
-#clearing stack
-sub sp sp 1
-#pushing return value
-move r1 3.000000
-push r1
-push r0
-j ra
+push -1
+jal 62
+jr -1
+#Function definition for
+#fib_return_number_params_@number_n
 sub sp sp 1
 peek r0
 add sp sp 1
-push ra
-jal 4
-pop ra
-pop r1
+move r1 2.000000
+slt r0 r0 r1
+breqz r0 9
+#return statement for 
+#fib_return_number_params_@number_n
+peek ra
+sub sp sp 1
+peek r1
+add sp sp 1
+sub sp sp 2
+push r1
+j ra
+#return statement for 
+#fib_return_number_params_@number_n
+peek ra
+sub sp sp 1
+peek r1
+add sp sp 1
+sub sp sp 2
+push r1
+j ra
+#return statement for 
+#fib_return_number_params_@number_n
+peek ra
+#calling function
+#fib
+sub sp sp 1
+peek r0
+add sp sp 1
+move r1 1.000000
 sub r0 r0 r1
 push r0
-peek r0
-s db Setting r0
 push ra
-jal 4
-pop ra
+jal 7
 pop r0
-sub sp sp 4
+#calling function
+#fib
+sub sp sp 1
 peek r1
-add sp sp 4
-sub r0 r0 r1
-push r0
-peek r0
-s db Setting r0
+add sp sp 1
+move r2 2.000000
+sub r1 r1 r2
+push r1
 push ra
-jal 4
-pop ra
+jal 7
+pop r1
+add r0 r0 r1
+sub sp sp 2
+push r0
+j ra
+#Function definition for
+#main_return_void_params_
+sub sp sp 1
+peek r0
+add sp sp 1
+move r1 1.000000
+add r0 r0 r1
+sub sp sp 2
+push r0
+add sp sp 1
+#calling function
+#fib
+sub sp sp 1
+peek r0
+add sp sp 1
+push r0
+push ra
+jal 7
 pop r0
 push r0
-peek r0
-sub sp sp 7
-peek r1
-add sp sp 7
-todo r0 r0 r1
-brgtz r0 0
-push ra
-jal 13
-pop ra
-pop r1
-peek r0
-sub sp sp 6
-peek r1
-add sp sp 6
-todo r0 r0 r1
-brgtz r0 0
-push ra
-jal 24
-pop ra
-pop r1
-j 35
+s db Setting r0
+yield
+sub sp sp 1
+j 62
+#return statement for 
+#main_return_void_params_
+peek ra
+sub sp sp 1
+push 0
+j ra

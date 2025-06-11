@@ -261,7 +261,7 @@ void* Optimizer::visitStmtIf(Stmt::If& stmt)
 				printf("Branching on constant simplified to false branch.\n");
 				return stmt.branch_false.release();
 			}
-			return new Stmt::Block({});
+			return new Stmt::Block({}, stmt.token);
 		}
 	}
 	stmt.branch_true->accept(*this);

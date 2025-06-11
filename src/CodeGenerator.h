@@ -28,13 +28,17 @@ public:
 	void define(const std::string& name, int size);
 	std::unique_ptr<StackVariable> resolve(const std::string& name);
 
+	bool is_in_function() const;
+	const std::string& function_name() const;
+
 	StackEnvironment* pop_to_function();
 	StackEnvironment* spawn();
 	StackEnvironment* spawn_in_function(const std::string& name);
 	StackEnvironment* pop();
-private:
+
 	StackEnvironment* child;
 	StackEnvironment* parent;
+private:
 	std::unique_ptr<std::string> m_function_name;
 	std::unordered_map<std::string, StackVariable> variables;
 	int m_frame_size;
@@ -73,6 +77,12 @@ struct Placeholder
 class CodeGenerator : public Expr::Visitor, public Stmt::Visitor
 {
 public:
+	enum class Pass
+	{
+		GlobalLinkage,
+		FunctionLinkage,
+	};
+
 	CodeGenerator(Compiler& compiler, TypeCheckedProgram& program);
 	void error(const Token& token, const std::string& str);
 
@@ -104,10 +114,12 @@ public:
 private:
 	std::string get_register_name(const Register& reg);
 
+	void comment(const std::string& val);
 	void emit_raw(const std::string& val);
 	void emit_register_use(const Register& reg);
 	void emit_register_use(const Register& a, const Register& b);
 	void emit_peek_stack_from_into(Register* reg);
+	void emit_store_into(int offset, const Register& source);
 	void emit_load_into(int offset, const std::string& register_label);
 	void emit_load_into(int offset, Register* reg);
 	Placeholder emit_placeholder();
@@ -120,6 +132,7 @@ private:
 	void push_env(const std::string& name);
 	void pop_env();
 
+	Pass pass = Pass::GlobalLinkage;
 	StackEnvironment* env;
 	StackEnvironment top_env;
 	RegisterAllocator allocator;

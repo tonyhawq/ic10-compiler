@@ -6,10 +6,12 @@ std::unique_ptr<StackVariable> StackEnvironment::resolve(const std::string& name
 	const auto& val = this->variables.find(name);
 	if (val != this->variables.end())
 	{
+		printf("resolved %s\n", name.c_str());
 		return std::make_unique<StackVariable>(this->variables.at(name));
 	}
 	if (this->parent)
 	{
+		printf("While resolving %s added %i because of frame size\n", name.c_str(), this->m_frame_size);
 		std::unique_ptr<StackVariable> var = this->parent->resolve(name);
 		var->offset += this->m_frame_size;
 		return var;
@@ -35,6 +37,32 @@ StackEnvironment::~StackEnvironment()
 	{
 		parent->child = nullptr;
 	}
+}
+
+bool StackEnvironment::is_in_function() const
+{
+	if (this->m_function_name)
+	{
+		return true;
+	}
+	if (!this->parent)
+	{
+		return false;
+	}
+	return this->parent->is_in_function();
+}
+
+const std::string& StackEnvironment::function_name() const
+{
+	if (this->m_function_name)
+	{
+		return *this->m_function_name;
+	}
+	if (!this->parent)
+	{
+		throw std::runtime_error("Attempted to get name of function while not inside function.");
+	}
+	return this->parent->function_name();
 }
 
 void StackEnvironment::define(const std::string& name, int size)
@@ -210,6 +238,19 @@ std::string CodeGenerator::generate()
 {
 	try
 	{
+		this->pass = Pass::GlobalLinkage;
+		for (auto& stmt : this->m_program.statements())
+		{
+			this->visit_stmt(stmt);
+		}
+		
+		this->emit_raw("push -1\n");
+		this->emit_raw("jal ");
+		this->emit_raw(this->m_program.env().root()->get_variable(Identifier("main"))->full_type().mangled_name());
+		this->emit_raw("\n");
+		this->emit_raw("jr -1\n");
+
+		this->pass = Pass::FunctionLinkage;
 		for (auto& stmt : this->m_program.statements())
 		{
 			this->visit_stmt(stmt);
@@ -319,16 +360,16 @@ void* CodeGenerator::visitExprBinary(Expr::Binary& expr)
 		this->emit_raw("div ");
 		break;
 	case TokenType::GREATER:
-		this->emit_raw("todo ");
+		this->emit_raw("sgt ");
 		break;
 	case TokenType::LESS:
-		this->emit_raw("todo ");
+		this->emit_raw("slt ");
 		break;
 	case TokenType::GREATER_EQUAL:
-		this->emit_raw("todo ");
+		this->emit_raw("sge ");
 		break;
 	case TokenType::LESS_EQUAL:
-		this->emit_raw("todo ");
+		this->emit_raw("sle ");
 		break;
 	default:
 		throw std::runtime_error("Binary operation had non +-*/ type.");
@@ -426,6 +467,30 @@ void CodeGenerator::emit_load_into(int offset, Register* reg)
 	this->emit_load_into(offset, this->get_register_name(*reg));
 }
 
+void CodeGenerator::emit_store_into(int offset, const Register& source)
+{
+	if (offset == 0)
+	{
+		this->emit_raw("sub sp sp 1\n");
+
+		this->emit_raw("push ");
+		this->emit_register_use(source);
+		this->emit_raw("\n");
+		return;
+	}
+	this->emit_raw("sub sp sp ");
+	this->emit_raw(std::to_string(offset + 1));
+	this->emit_raw("\n");
+
+	this->emit_raw("push ");
+	this->emit_register_use(source);
+	this->emit_raw("\n");
+
+	this->emit_raw("add sp sp ");
+	this->emit_raw(std::to_string(offset));
+	this->emit_raw("\n");
+}
+
 void* CodeGenerator::visitExprVariable(Expr::Variable& expr)
 {
 	Register reg = this->allocator.allocate();
@@ -440,7 +505,92 @@ void* CodeGenerator::visitExprVariable(Expr::Variable& expr)
 
 void* CodeGenerator::visitExprAssignment(Expr::Assignment& expr)
 {
-	
+	Register value = this->visit_expr(expr.value);
+	std::unique_ptr<StackVariable> var = this->env->resolve(expr.name.lexeme);
+	if (!var)
+	{
+		throw std::runtime_error("Attempt to use undefined variable.");
+	}
+	this->emit_store_into(var->offset, value);
+	return nullptr;
+}
+
+void* CodeGenerator::visitStmtReturn(Stmt::Return& expr)
+{
+	this->comment("return statement for ");
+	this->comment(this->env->function_name().substr(sizeof("@function")));
+
+	int return_address_offset = this->env->resolve("@return")->offset;
+	this->emit_load_into(return_address_offset, "ra");
+
+	std::unique_ptr<Register> return_value;
+
+	// push return value
+	if (expr.value)
+	{
+		return_value = std::make_unique<Register>(this->visit_expr(expr.value));
+	}
+
+	StackEnvironment* env_to_pop = this->env;
+	int stack_values_to_pop = 0;
+	while (env_to_pop->is_in_function())
+	{
+		stack_values_to_pop += env_to_pop->frame_size();
+		env_to_pop = env_to_pop->parent;
+	}
+
+	if (stack_values_to_pop > 0)
+	{
+		this->emit_raw("sub sp sp ");
+		this->emit_raw(std::to_string(stack_values_to_pop));
+		this->emit_raw("\n");
+	}
+
+	if (return_value)
+	{
+		this->emit_raw("push ");
+		this->emit_register_use(*return_value);
+		this->emit_raw("\n");
+	}
+	else
+	{
+		this->emit_raw("push 0\n");
+	}
+
+	// jump to return address (loaded from @return)
+	this->emit_raw("j ra\n");
+
+	return nullptr;
+}
+
+void* CodeGenerator::visitStmtFunction(Stmt::Function& expr)
+{
+	// function definitons are only on top level
+	std::string name = this->m_program.env().root()->get_variable(expr.name.lexeme)->full_type().mangled_name();
+
+	this->comment("Function definition for");
+	this->comment(name.substr(sizeof("@function")));
+
+	this->emit_raw(name);
+	this->emit_raw(":");
+	this->push_env(name);
+
+	// get all arguments
+	for (const auto& param : expr.params)
+	{
+		this->env->define(param.name.lexeme, 1);
+	}
+
+	// then get return address
+	this->env->define("@return", 1);
+
+	for (auto& stmt : expr.body)
+	{
+		this->visit_stmt(stmt);
+	}
+
+	this->env = this->env->pop_to_function();
+	this->pop_env();
 
 	return nullptr;
 }
@@ -456,11 +606,17 @@ void* CodeGenerator::visitExprCall(Expr::Call& expr)
 			throw std::runtime_error("Attempted to call a non-existent function.");
 		}
 		name = var->full_type().mangled_name();
+		this->comment("calling function");
+		this->comment(var->full_type().unmangled_name());
 	}
 	else
 	{
 		throw std::runtime_error("Non-static functions not implemented yet.");
 	}
+
+	// pushes all arguments
+	// then pushes return address
+
 	for (auto& arg : expr.arguments)
 	{
 		Register loaded = this->visit_expr(arg);
@@ -469,14 +625,12 @@ void* CodeGenerator::visitExprCall(Expr::Call& expr)
 		this->emit_raw("\n");
 	}
 	this->emit_raw("push ra\n");
-
+	
 	this->emit_raw("jal ");
 	this->emit_raw(name);
 	this->emit_raw("\n");
 
-	this->emit_raw("pop ra\n");
 	Register return_value = this->allocator.allocate();
-	
 	this->emit_raw("pop ");
 	this->emit_register_use(return_value);
 	this->emit_raw("\n");
@@ -512,7 +666,23 @@ void* CodeGenerator::visitExprLogical(Expr::Logical& expr)
 
 void CodeGenerator::visit_stmt(std::unique_ptr<Stmt>& stmt)
 {
-	stmt->accept(*this);
+	if (this->pass == Pass::GlobalLinkage)
+	{
+		if (typeid(*stmt) == typeid(Stmt::Variable))
+		{
+			stmt->accept(*this);
+		}
+		return;
+	}
+	if (this->pass == Pass::FunctionLinkage)
+	{
+		if (!this->env->is_in_function() && typeid(*stmt) == typeid(Stmt::Variable))
+		{
+			return;
+		}
+		stmt->accept(*this);
+		return;
+	}
 }
 
 void* CodeGenerator::visitStmtExpression(Stmt::Expression& expr)
@@ -562,6 +732,16 @@ void* CodeGenerator::visitStmtBlock(Stmt::Block& expr)
 	for (auto& stmt : expr.statements)
 	{
 		this->visit_stmt(stmt);
+		if (stmt->is<Stmt::Return>())
+		{
+			return nullptr;
+		}
+	}
+	if (this->env->frame_size() > 0)
+	{
+		this->emit_raw("sub sp sp ");
+		this->emit_raw(std::to_string(this->env->frame_size()));
+		this->emit_raw("\n");
 	}
 	this->pop_env();
 
@@ -598,7 +778,7 @@ void* CodeGenerator::visitStmtIf(Stmt::If& expr)
 {
 	Register value = this->visit_expr(expr.condition);
 	
-	this->emit_raw("brgtz ");
+	this->emit_raw("breqz ");
 	this->emit_register_use(value);
 	this->emit_raw(" ");
 	Placeholder placeholder = this->emit_placeholder();
@@ -609,6 +789,7 @@ void* CodeGenerator::visitStmtIf(Stmt::If& expr)
 	{
 		this->visit_stmt(expr.branch_false);
 	}
+	this->visit_stmt(expr.branch_true);
 	int jump_length = this->current_line() - length_before;
 	this->emit_replace_placeholder(placeholder, std::to_string(jump_length));
 
@@ -617,70 +798,11 @@ void* CodeGenerator::visitStmtIf(Stmt::If& expr)
 	return nullptr;
 }
 
-void* CodeGenerator::visitStmtFunction(Stmt::Function& expr)
+void CodeGenerator::comment(const std::string& val)
 {
-	// function definitons are only on top level
-	std::string name = this->m_program.env().root()->get_variable(expr.name.lexeme)->full_type().mangled_name();
-
-	this->emit_raw(name);
-	this->emit_raw(":");
-	this->push_env(name);
-	for (const auto& param : expr.params)
-	{
-		this->env->define(param.name.lexeme, 1);
-	}
-	// return address
-	this->env->define("@return", 1);
-	for (auto& stmt : expr.body)
-	{
-		this->visit_stmt(stmt);
-	}
-
-	return nullptr;
-}
-
-void* CodeGenerator::visitStmtReturn(Stmt::Return& expr)
-{
-	std::unique_ptr<StackVariable> return_address_offset = this->env->resolve("@return");
-	if (!return_address_offset)
-	{
-		throw std::runtime_error("Attempted to return without a return address being defined.");
-	}
-	
-	this->emit_raw("#loading return address from stack\n");
-	Register return_address = this->allocator.allocate();
-	this->emit_load_into(return_address_offset->offset, &return_address);
-	
-	this->emit_raw("#clearing stack\n");
-	if (this->env->frame_size() > 0)
-	{
-		this->emit_raw("sub sp sp ");
-		this->emit_raw(std::to_string(this->env->frame_size()));
-		this->emit_raw("\n");
-	}
-
-	this->emit_raw("#pushing return value\n");
-	if (expr.value)
-	{
-		Register value = this->visit_expr(expr.value);
-		this->emit_raw("push ");
-		this->emit_register_use(value);
-		this->emit_raw("\n");
-	}
-	else
-	{
-		this->emit_raw("push 0\n");
-	}
-
-	this->emit_raw("push ");
-	this->emit_register_use(return_address);
+	this->emit_raw("#");
+	this->emit_raw(val);
 	this->emit_raw("\n");
-	this->emit_raw("j ra\n");
-
-	this->env = this->env->pop_to_function();
-	this->pop_env();
-
-	return nullptr;
 }
 
 void* CodeGenerator::visitStmtWhile(Stmt::While& expr)

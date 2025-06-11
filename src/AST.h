@@ -176,7 +176,8 @@ struct Stmt::If : public Stmt
 
 struct Stmt::Block : public Stmt
 {
-	Block(std::vector<std::unique_ptr<Stmt>> statements) :statements(std::move(statements)) {};
+	Block(std::vector<std::unique_ptr<Stmt>> statements, const Token& right_brace) :statements(std::move(statements)), right_brace(right_brace) {};
+	Token right_brace;
 	std::vector<std::unique_ptr<Stmt>> statements;
 	NODE_VISIT_IMPL(Stmt, Block)
 };

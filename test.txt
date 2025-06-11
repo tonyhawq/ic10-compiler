@@ -1,38 +1,21 @@
- 
-number min = 0;
-number max = 10;
+number iter = 0;
 
-function temp() -> number
+function fib(number n) -> number
 {
-	return 3;
-}
-
-function heat() -> void
-{
-	number to_heat = max - temp();
-	asm "peek r0";
-	asm "s db Setting r0";
-}
-
-function cool() -> void
-{
-	number to_cool = temp() - min;
-	asm "peek r0";
-	asm "s db Setting r0";
+	if (n < 2)
+	{
+		return n;
+	}
+	return fib(n - 1) + fib(n - 2);
 }
 
 function main() -> void
 {
 	while (true)
 	{
-		number temperature = temp();
-		if (temperature < min)
-		{
-			heat();
-		}
-		if (temperature > max)
-		{
-			cool();
-		}
+		iter = iter + 1;
+		number val = fib(iter);
+		asm "s db Setting r0";
+		asm "yield";
 	}
 }
