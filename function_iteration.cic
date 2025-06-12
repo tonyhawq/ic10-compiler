@@ -1,0 +1,15 @@
+
+static number iter = 0;
+
+function increment(number x) -> number
+{
+	return x + 1;
+}
+
+
+function main() -> void
+{
+	iter = increment(iter);
+	asm "yield";
+	return;
+}
