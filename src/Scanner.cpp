@@ -25,6 +25,9 @@ std::unordered_map<std::string, TokenType> Scanner::keywords = {
 	{"const", TokenType::CONST},
 	{"nodiscard", TokenType::NODISCARD},
 	{"static", TokenType::STATIC},
+	{"dload", TokenType::DLOAD},
+	{"dset", TokenType::DSET},
+	{"fixed", TokenType::FIXED}
 };
 
 Scanner::Scanner(Compiler& compiler, const std::string& in)
@@ -56,24 +59,27 @@ char Scanner::advance()
 	return this->source.at(to_eat);
 }
 
-void Scanner::add_token(TokenType type)
+Token& Scanner::add_token(TokenType type)
 {
-	this->add_token(type, nullptr);
+	return this->add_token(type, nullptr);
 }
 
-void Scanner::add_token(TokenType type, double literal)
+Token& Scanner::add_token(TokenType type, double literal)
 {
 	this->tokens.emplace_back(this->current_line, type, this->source.substr(this->token_start, this->current_character - this->token_start), literal);
+	return this->tokens.at(this->tokens.size() - 1);
 }
 
-void Scanner::add_token(TokenType type, const char* literal)
+Token& Scanner::add_token(TokenType type, const char* literal)
 {
 	this->tokens.emplace_back(this->current_line, type, this->source.substr(this->token_start, this->current_character - this->token_start), literal);
+	return this->tokens.at(this->tokens.size() - 1);
 }
 
-void Scanner::add_token(TokenType type, bool literal)
+Token& Scanner::add_token(TokenType type, bool literal)
 {
 	this->tokens.emplace_back(this->current_line, type, this->source.substr(this->token_start, this->current_character - this->token_start), literal);
+	return this->tokens.at(this->tokens.size() - 1);
 }
 
 bool Scanner::match(char character)
@@ -127,7 +133,7 @@ void Scanner::scan_hashed_string()
 	}
 	this->advance();
 	std::string substr = this->source.substr(this->token_start, this->current_character - this->token_start);
-	this->add_token(TokenType::HASHED_STRING, substr.c_str());
+	this->add_token(TokenType::HASHED_STRING, substr.c_str()).literal.string_hashed = true;
 }
 
 bool Scanner::is_digit(char character)

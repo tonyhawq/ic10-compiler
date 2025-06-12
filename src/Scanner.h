@@ -16,10 +16,10 @@ public:
 	bool at_eof();
 	void scan_token();
 	char advance();
-	void add_token(TokenType type);
-	void add_token(TokenType type, const char* literal);
-	void add_token(TokenType type, double literal);
-	void add_token(TokenType type, bool literal);
+	Token& add_token(TokenType type);
+	Token& add_token(TokenType type, const char* literal);
+	Token& add_token(TokenType type, double literal);
+	Token& add_token(TokenType type, bool literal);
 	void scan_hashed_string();
 	void scan_string();
 	void scan_number();

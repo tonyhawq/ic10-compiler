@@ -284,14 +284,25 @@ TypeChecker::Operator::ReturnType TypeChecker::OperatorOverload::return_type(con
 	{
 		return std::string("Requires ") + std::to_string(this->arg_types.size()) + " arguments, got " + std::to_string(args.size());
 	}
+	bool all_fixed = true;
 	for (int i = 0; i < this->arg_types.size(); i++)
 	{
 		const TypeName& arg = args[i];
 		const TypeName& param = this->arg_types[i];
+		if (!arg.compile_time)
+		{
+			all_fixed = false;
+		}
 		if (!TypeChecker::can_assign(param, arg))
 		{
 			return std::string("Cannot assign argument ") + std::to_string(i + 1) + " of type " + arg.type_name() + " to " + param.type_name();
 		}
+	}
+	if (all_fixed)
+	{
+		TypeName compile_time_result = this->m_return_type;
+		compile_time_result.compile_time = true;
+		return compile_time_result;
 	}
 	return this->m_return_type;
 }
@@ -333,6 +344,10 @@ TypeChecker::Operator::ReturnType TypeChecker::OperatorOverload::Addressof::retu
 		return Operator::ReturnType("Requires 1 argument.");
 	}
 	TypeName arg = args.at(0);
+	if (arg.compile_time)
+	{
+		return Operator::ReturnType("Cannot take the address of a compile-time fixed variable.");
+	}
 	arg.make_pointer_type(false, false);
 	return arg;
 }
@@ -564,18 +579,21 @@ void* TypeChecker::visitExprLiteral(Expr::Literal& expr)
 	if (expr.literal.literal.string)
 	{
 		TypeName* type = new TypeName(true, "string");
+		type->compile_time = true;
 		expr.type = *type;
 		return type;
 	}
 	if (expr.literal.literal.number)
 	{
 		TypeName* type = new TypeName(true, "number");
+		type->compile_time = true;
 		expr.type = *type;
 		return type;
 	}
 	if (expr.literal.literal.boolean)
 	{
 		TypeName* type = new TypeName(true, "boolean");
+		type->compile_time = true;
 		expr.type = *type;
 		return type;
 	}
@@ -643,12 +661,22 @@ bool TypeChecker::can_initalize(const TypeName& to, const TypeName& from)
 		// cannot initalize a number* from a const number*
 		return false;
 	}
+	if (to.compile_time && (!from.compile_time))
+	{
+		// cannot initalize a compile time variable from a non-compile-time var
+		return false;
+	}
 	// can initalize a number from a const number (with copy)
 	return true;
 }
 
 bool TypeChecker::can_assign(const TypeName& to, const TypeName& from)
 {
+	if (to.compile_time)
+	{
+		// can never reassign a compile time variable
+		return false;
+	}
 	if (to == from)
 	{
 		return true;

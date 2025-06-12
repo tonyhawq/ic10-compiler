@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <stdexcept>
 
 enum class TokenType
 {
@@ -35,6 +36,7 @@ enum class TokenType
 	STRING,
 	HASHED_STRING,
 
+	FIXED,
 	STATIC,
 	NODISCARD,
 	CONST,
@@ -52,6 +54,8 @@ enum class TokenType
 	FALSE,
 	ASM,
 	PRINT,
+	DLOAD,
+	DSET,
 
 	T_EOF
 };
@@ -67,7 +71,18 @@ struct Literal
 	Literal(Literal&& other) noexcept;
 	std::string display();
 
+	bool is_number() const;
+	bool is_string() const;
+	bool is_hashstring() const;
+	bool is_boolean() const;
+
+	double as_number() const;
+	const std::string& as_string() const;
+	const std::string& as_hash_string() const;
+	bool as_boolean() const;
+
 	double* number;
+	bool string_hashed;
 	std::string* string;
 	bool* boolean;
 };

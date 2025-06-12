@@ -12,8 +12,9 @@
 
 struct TypeName
 {
-	explicit TypeName(const std::string& type_name) :m_type_name(std::make_unique<std::string>(type_name)), constant(false), pointer(false) {};
-	TypeName(bool constant, const std::string& type_name) :m_type_name(std::make_unique<std::string>(type_name)), constant(constant), pointer(false) {};
+	explicit TypeName(const std::string& type_name) :m_type_name(std::make_unique<std::string>(type_name)), constant(false), pointer(false), compile_time(false) {};
+	TypeName(bool constant, const std::string& type_name) :m_type_name(std::make_unique<std::string>(type_name)), constant(constant), pointer(false), compile_time(false) {};
+	static TypeName create_compile_time(const std::string& type_name);
 	TypeName(const TypeName& other);
 	TypeName& operator=(const TypeName& other);
 	TypeName(TypeName&& other) noexcept = default;
@@ -31,13 +32,14 @@ struct TypeName
 	bool operator==(const TypeName& other) const;
 	bool operator!=(const TypeName& other) const;
 
+	bool compile_time;
 	bool constant;
 	bool pointer;
 	std::unique_ptr<bool> m_nullable;
 	std::unique_ptr<TypeName> m_pointed_to_type;
 	std::unique_ptr<std::string> m_type_name;
 private:
-	TypeName() : constant(false), pointer(false), m_pointed_to_type(nullptr), m_type_name(nullptr) {};
+	TypeName() : constant(false), compile_time(false), pointer(false), m_pointed_to_type(nullptr), m_type_name(nullptr) {};
 };
 
 namespace std {
@@ -59,6 +61,7 @@ struct Expr
 	struct Assignment;
 	struct Call;
 	struct Logical;
+	struct DeviceLoad;
 	class Visitor;
 
 	template <typename T>
@@ -82,6 +85,7 @@ public:
 	virtual void* visitExprAssignment(Expr::Assignment& expr) { return nullptr; };
 	virtual void* visitExprCall(Expr::Call& expr) { return nullptr; }
 	virtual void* visitExprLogical(Expr::Logical& expr) { return nullptr; }
+	virtual void* visitExprDeviceLoad(Expr::DeviceLoad& expr) { return nullptr; }
 private:
 };
 
@@ -103,6 +107,7 @@ struct Stmt
 	struct Return;
 	struct While;
 	struct Static;
+	struct DeviceSet;
 	class Visitor;
 
 	template <typename T>
@@ -130,6 +135,7 @@ public:
 	virtual void* visitStmtReturn(Stmt::Return& expr) { return nullptr; }
 	virtual void* visitStmtWhile(Stmt::While& expr) { return nullptr; }
 	virtual void* visitStmtStatic(Stmt::Static& expr) { return nullptr; }
+	virtual void* visitStmtDeviceSet(Stmt::DeviceSet& expr) { return nullptr; }
 private:
 };
 
@@ -219,6 +225,14 @@ struct Stmt::Asm : public Stmt
 	Asm(std::shared_ptr<Expr> literal) :literal(literal) {};
 	std::shared_ptr<Expr> literal;
 	NODE_VISIT_IMPL(Stmt, Asm)
+};
+
+struct Expr::DeviceLoad : public Expr
+{
+	DeviceLoad();
+	Token logic_type;
+	std::shared_ptr<Expr> device;
+	NODE_VISIT_IMPL(Expr, DeviceLoad)
 };
 
 struct Expr::Logical : public Expr

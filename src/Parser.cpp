@@ -31,13 +31,26 @@ void Parser::synchronize()
 
 TypeName Parser::parse_type()
 {
+	// type:
+	// const | fixed identifier (pointer_decl)*
+	// pointer decl:
+	// const? star question?
 	bool base_is_const = false;
+	bool base_is_fixed = false;
 	if (this->match({ TokenType::CONST }))
 	{
 		base_is_const = true;
 	}
+	else if (this->match({ TokenType::FIXED }))
+	{
+		base_is_fixed = true;
+	}
 	const Token& type = this->consume(TokenType::IDENTIFIER, "Expected type name");
 	TypeName type_info = TypeName(base_is_const, type.lexeme);
+	if (base_is_fixed)
+	{
+		type_info.compile_time = true;
+	}
 	while (true)
 	{
 		bool is_const = false;

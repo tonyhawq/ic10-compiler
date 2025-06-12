@@ -1,7 +1,7 @@
 #include "Token.h"
 
 Literal::Literal()
-	:number(nullptr), string(nullptr), boolean(nullptr)
+	:number(nullptr), string(nullptr), boolean(nullptr), string_hashed(false)
 {}
 
 Literal::Literal(const char* string)
@@ -39,7 +39,7 @@ Literal::~Literal()
 }
 
 Literal::Literal(const Literal& other)
-	:number(nullptr), string(nullptr), boolean(nullptr)
+	:number(nullptr), string(nullptr), boolean(nullptr), string_hashed(other.string_hashed)
 {
 	if (other.number)
 	{
@@ -56,7 +56,7 @@ Literal::Literal(const Literal& other)
 }
 
 Literal::Literal(Literal&& other) noexcept
-	:number(other.number), string(other.string), boolean(other.boolean)
+	:number(other.number), string(other.string), boolean(other.boolean), string_hashed(other.string_hashed)
 {
 	other.number = nullptr;
 	other.string = nullptr;
@@ -78,6 +78,62 @@ std::string Literal::display()
 		return std::to_string(*this->boolean);
 	}
 	return std::string("NULL");
+}
+
+bool Literal::is_number() const
+{
+	return this->number;
+}
+
+bool Literal::is_string() const
+{
+	return this->string && !this->string_hashed;
+}
+
+bool Literal::is_hashstring() const
+{
+	return this->string && this->string_hashed;
+}
+
+bool Literal::is_boolean() const
+{
+	return this->boolean;
+}
+
+double Literal::as_number() const
+{
+	if (!this->is_number())
+	{
+		throw std::runtime_error("Attempted to get number literal while literal is not of type number.");
+	}
+	return *this->number;
+}
+
+const std::string& Literal::as_string() const
+{
+	if (!this->is_string())
+	{
+		throw std::runtime_error("Attempted to get string literal while literal is not of type string.");
+	}
+	return *this->string;
+}
+
+const std::string& Literal::as_hash_string() const
+{
+	if (!this->is_hashstring())
+	{
+		throw std::runtime_error("Attempted to get hash string literal while literal is not of type hash string.");
+	}
+	return *this->string;
+}
+
+bool Literal::as_boolean() const
+{
+	if (!this->is_boolean())
+	{
+		throw std::runtime_error("Attempted to get boolean literal while literal is not of type boolean.");
+	}
+	return *this->boolean;
 }
 
 Token::Token(int line, TokenType type, const std::string& lexeme)
