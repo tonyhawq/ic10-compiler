@@ -77,7 +77,10 @@ move sp r1
 #fib
 #Storing register values
 #Stored.
-move r0 5.000000
+move r1 sp 
+move sp 1
+peek r0
+move sp r1
 push r0
 jal 7
 #Getting return value

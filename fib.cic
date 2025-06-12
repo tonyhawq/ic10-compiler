@@ -1,0 +1,18 @@
+static number iter = 0;
+
+function fib(number n) -> number
+{
+	if (n < 2)
+	{
+		return n;
+	}
+	return fib(n-1) + fib(n-2);
+}
+
+function main() -> void
+{
+	iter = iter + 1;
+	number fibbed = fib(iter);
+	asm "yield";
+	return;
+}
