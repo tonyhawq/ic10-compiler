@@ -6,11 +6,12 @@ typedef std::shared_ptr<int> RegisterHandle;
 
 struct StackVariable
 {
-	StackVariable(const std::string& name, int size) :name(name), size(size), offset(0), is_static(false) {};
+	StackVariable(const std::string& name, int size) :name(name), size(size), offset(0), is_static(false), id(0) {};
 	std::string name;
 	int offset;
 	int size;
 	bool is_static;
+	size_t id;
 };
 
 class StackEnvironment
@@ -27,6 +28,7 @@ public:
 	void set_frame_size(int value);
 	int frame_size() const;
 
+	void forget(const std::string& name);
 	void define(const std::string& name, int size);
 	void define_static(const std::string& name, int size);
 	std::unique_ptr<StackVariable> resolve(const std::string& name);
@@ -44,6 +46,7 @@ public:
 private:
 	std::unique_ptr<std::string> m_function_name;
 	std::unordered_map<std::string, StackVariable> variables;
+	std::vector<StackVariable*> variable_list;
 	int m_frame_size;
 };
 
@@ -58,6 +61,8 @@ public:
 	RegisterHandle* release();
 	RegisterHandle handle();
 	int index() const;
+
+	std::string to_string() const;
 private:
 	RegisterHandle register_handle;
 };
@@ -68,6 +73,8 @@ public:
 	RegisterAllocator(size_t register_count);
 	~RegisterAllocator();
 	Register allocate();
+
+	std::vector<Register> registers_in_use() const;
 private:
 	std::vector<RegisterHandle> registers;
 };
@@ -116,6 +123,11 @@ public:
 	virtual void* visitStmtWhile(Stmt::While& expr);
 	virtual void* visitStmtStatic(Stmt::Static& expr) override;
 private:
+	void store_register_values();
+	void restore_register_values();
+
+	std::vector<Register> stored_registers;
+
 	std::string get_register_name(const Register& reg);
 
 	void comment(const std::string& val);

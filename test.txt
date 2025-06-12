@@ -6,7 +6,10 @@ function fib(number n) -> number
 	{
 		return n;
 	}
-	return fib(n - 1) + fib(n - 2);
+	number first = fib(n - 1);
+	number second = fib(n - 2);
+	return first + second;
+	#return fib(n - 1) + fib(n - 2);
 }
 
 function main() -> void

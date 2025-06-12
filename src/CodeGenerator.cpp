@@ -72,6 +72,25 @@ const std::string& StackEnvironment::function_name() const
 	return this->parent->function_name();
 }
 
+void StackEnvironment::forget(const std::string& name)
+{
+	for (auto iterator = this->variables.begin(); iterator != this->variables.end(); iterator++)
+	{
+		if (iterator->first == name)
+		{
+			size_t id = iterator->second.id;
+			int size = iterator->second.size;
+			this->variables.erase(iterator);
+			for (size_t i = 0; i < id; i++)
+			{
+				this->variable_list[i]->offset -= size;
+			}
+			return;
+		}
+	}
+	throw std::runtime_error(std::string("Attempted to forget a non-existent variable: ") + name);
+}
+
 void StackEnvironment::define(const std::string& name, int size)
 {
 	for (auto& var : this->variables)
@@ -79,6 +98,9 @@ void StackEnvironment::define(const std::string& name, int size)
 		var.second.offset += size;
 	}
 	this->variables.emplace(name, StackVariable(name, size));
+	StackVariable* var = &this->variables.at(name);
+	var->id = this->variable_list.size();
+	this->variable_list.push_back(var);
 	this->m_frame_size += size;
 }
 
@@ -171,6 +193,11 @@ Register::Register(RegisterHandle handle)
 Register::~Register()
 {}
 
+std::string Register::to_string() const
+{
+	return std::string("r") + std::to_string(this->index());
+}
+
 RegisterHandle Register::handle()
 {
 	return this->register_handle;
@@ -197,6 +224,21 @@ RegisterAllocator::RegisterAllocator(size_t register_count)
 
 RegisterAllocator::~RegisterAllocator()
 {}
+
+std::vector<Register> RegisterAllocator::registers_in_use() const
+{
+	std::vector<Register> used_registers;
+	used_registers.reserve(this->registers.size());
+	for (size_t i = 0; i < this->registers.size(); i++)
+	{
+		const auto& reg = this->registers[i];
+		if (reg.use_count() > 1)
+		{
+			used_registers.push_back(Register(reg));
+		}
+	}
+	return used_registers;
+}
 
 Register RegisterAllocator::allocate()
 {
@@ -303,8 +345,7 @@ void CodeGenerator::emit_raw(const std::string& val)
 
 void CodeGenerator::emit_register_use(const Register& reg)
 {
-	this->emit_raw("r");
-	this->emit_raw(std::to_string(reg.index()));
+	this->emit_raw(reg.to_string());
 }
 
 void CodeGenerator::emit_register_use(const Register& a, const Register& b)
@@ -667,6 +708,40 @@ void* CodeGenerator::visitStmtFunction(Stmt::Function& expr)
 	return nullptr;
 }
 
+void CodeGenerator::store_register_values()
+{
+	if (this->stored_registers.size() > 0)
+	{
+		throw std::runtime_error("Attempted to store register values while already having registers stored.");
+	}
+	this->stored_registers = this->allocator.registers_in_use();
+	for (int i = 0; i < this->stored_registers.size(); i++)
+	{
+		const Register& reg = this->stored_registers[i];
+		this->env->define(std::string("@s_") + reg.to_string(), 1);
+		this->emit_raw("push ");
+		this->emit_register_use(reg);
+		this->emit_raw("\n");
+	}
+}
+
+void CodeGenerator::restore_register_values()
+{
+	if (this->stored_registers.size() == 0)
+	{
+		return;
+	}
+	for (int i = this->stored_registers.size() - 1; i >= 0; i--)
+	{
+		const Register& reg = this->stored_registers[i];
+		this->env->forget(std::string("@s_") + reg.to_string());
+		this->emit_raw("pop ");
+		this->emit_register_use(reg);
+		this->emit_raw("\n");
+	}
+	this->stored_registers.clear();
+}
+
 void* CodeGenerator::visitExprCall(Expr::Call& expr)
 {
 	std::string name;
@@ -685,6 +760,9 @@ void* CodeGenerator::visitExprCall(Expr::Call& expr)
 	{
 		throw std::runtime_error("Non-static functions not implemented yet.");
 	}
+
+	this->comment("Storing register values");
+	this->store_register_values();
 
 	// pushes all arguments
 	// then pushes return address
@@ -705,6 +783,9 @@ void* CodeGenerator::visitExprCall(Expr::Call& expr)
 	this->emit_raw("pop ");
 	this->emit_register_use(return_value);
 	this->emit_raw("\n");
+
+	this->comment("Restoring register values");
+	this->restore_register_values();
 	
 	return return_value.release();
 }
