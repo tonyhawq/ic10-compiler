@@ -198,6 +198,7 @@ public:
 	virtual void* visitStmtIf(Stmt::If& stmt) override;
 	virtual void* visitStmtFunction(Stmt::Function& expr) override;
 	virtual void* visitStmtReturn(Stmt::Return& expr) override;
+	virtual void* visitStmtStatic(Stmt::Static& expr) override;
 private:
 	bool seen_main = false;
 

@@ -1,0 +1,16 @@
+static number iter = 42;
+
+function increment(number _) -> void
+{
+	while (true)
+	{
+		iter = iter + 1;
+		asm "yield";
+	}
+}
+
+function main() -> void
+{
+	increment(80085);
+	return;
+}

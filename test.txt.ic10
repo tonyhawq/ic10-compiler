@@ -1,19 +1,21 @@
 move r0 42.000000
 push r0
-jal 20
+jal 22
 sub sp sp 1
 jr -2
 #Function definition for
 #increment_return_void_params_@number__
 push ra
-sub sp sp 2
+move r1 sp 
+move sp 1
 peek r0
-add sp sp 2
+move sp r1
 move r1 1.000000
 add r0 r0 r1
-sub sp sp 3
+move r1 sp 
+move sp 0
 push r0
-add sp sp 2
+move sp r1
 yield
 j 8
 #Function definition for

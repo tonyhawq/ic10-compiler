@@ -63,6 +63,11 @@ TypeName Parser::parse_type()
 	return type_info;
 }
 
+std::unique_ptr<Stmt> Parser::parse_static_declaration()
+{
+	return std::make_unique<Stmt::Static>(std::unique_ptr<Stmt::Variable>(dynamic_cast<Stmt::Variable*>(this->parse_variable_declaration().release())));
+}
+
 std::unique_ptr<Stmt> Parser::parse_variable_declaration()
 {
 	TypeName type_info = this->parse_type();
@@ -117,18 +122,18 @@ std::unique_ptr<Stmt> Parser::parse_symbols()
 		{
 			return this->parse_function_declaration();
 		}
-		if (this->peek_var_decl())
+		if (this->match({TokenType::STATIC}))
 		{
-			return this->parse_variable_declaration();
+			return this->parse_static_declaration();
 		}
-		this->error(this->peek(), "Expected declaration.");
+		this->error(this->peek(), "Expected a function or static variable declaration.");
 	}
 	catch (ParseError)
 	{
 		this->synchronize();
 		return nullptr;
 	}
-	this->error(this->peek(), "??? Expected declaration.");
+	this->error(this->peek(), "Fell through.");
 	return nullptr;
 }
 

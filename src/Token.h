@@ -35,6 +35,7 @@ enum class TokenType
 	STRING,
 	HASHED_STRING,
 
+	STATIC,
 	NODISCARD,
 	CONST,
 	AND,

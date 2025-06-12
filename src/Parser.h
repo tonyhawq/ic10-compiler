@@ -48,6 +48,7 @@ private:
 	std::unique_ptr<Stmt> parse_if();
 	std::unique_ptr<Stmt> parse_block();
 	std::unique_ptr<Stmt> parse_variable_declaration();
+	std::unique_ptr<Stmt> parse_static_declaration();
 	std::unique_ptr<Stmt> parse_function_declaration();
 	std::unique_ptr<Stmt> parse_symbols();
 	std::unique_ptr<Stmt> parse_declaration();

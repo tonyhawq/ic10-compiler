@@ -102,6 +102,7 @@ struct Stmt
 	struct Function;
 	struct Return;
 	struct While;
+	struct Static;
 	class Visitor;
 
 	template <typename T>
@@ -128,7 +129,15 @@ public:
 	virtual void* visitStmtFunction(Stmt::Function& expr) { return nullptr; }
 	virtual void* visitStmtReturn(Stmt::Return& expr) { return nullptr; }
 	virtual void* visitStmtWhile(Stmt::While& expr) { return nullptr; }
+	virtual void* visitStmtStatic(Stmt::Static& expr) { return nullptr; }
 private:
+};
+
+struct Stmt::Static : public Stmt
+{
+	Static(std::unique_ptr<Stmt::Variable> var) :var(std::move(var)) {};
+	std::unique_ptr<Stmt::Variable> var;
+	NODE_VISIT_IMPL(Stmt, Static)
 };
 
 struct Stmt::Return : public Stmt

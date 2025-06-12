@@ -6,9 +6,11 @@ typedef std::shared_ptr<int> RegisterHandle;
 
 struct StackVariable
 {
+	StackVariable(const std::string& name, int size) :name(name), size(size), offset(0), is_static(false) {};
 	std::string name;
 	int offset;
 	int size;
+	bool is_static;
 };
 
 class StackEnvironment
@@ -26,6 +28,7 @@ public:
 	int frame_size() const;
 
 	void define(const std::string& name, int size);
+	void define_static(const std::string& name, int size);
 	std::unique_ptr<StackVariable> resolve(const std::string& name);
 
 	bool is_in_function() const;
@@ -111,6 +114,7 @@ public:
 	virtual void* visitStmtFunction(Stmt::Function& expr);
 	virtual void* visitStmtReturn(Stmt::Return& expr);
 	virtual void* visitStmtWhile(Stmt::While& expr);
+	virtual void* visitStmtStatic(Stmt::Static& expr) override;
 private:
 	std::string get_register_name(const Register& reg);
 

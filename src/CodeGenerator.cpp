@@ -6,11 +6,20 @@ std::unique_ptr<StackVariable> StackEnvironment::resolve(const std::string& name
 	const auto& val = this->variables.find(name);
 	if (val != this->variables.end())
 	{
-		return std::make_unique<StackVariable>(this->variables.at(name));
+		std::unique_ptr<StackVariable> var = std::make_unique<StackVariable>(this->variables.at(name));
+		if (var->is_static)
+		{
+			var->offset = -(var->offset + 1);
+		}
+		return var;
 	}
 	if (this->parent)
 	{
 		std::unique_ptr<StackVariable> var = this->parent->resolve(name);
+		if (var->is_static)
+		{
+			return var;
+		}
 		var->offset += this->m_frame_size;
 		return var;
 	}
@@ -69,8 +78,15 @@ void StackEnvironment::define(const std::string& name, int size)
 	{
 		var.second.offset += size;
 	}
-	this->variables.emplace(name, StackVariable{ name, 0, size });
+	this->variables.emplace(name, StackVariable(name, size));
 	this->m_frame_size += size;
+}
+
+void StackEnvironment::define_static(const std::string& name, int size)
+{
+	this->define(name, size);
+	StackVariable& var = this->variables.at(name);
+	var.is_static = true;
 }
 
 void StackEnvironment::set_frame_size(int value)
@@ -445,6 +461,32 @@ std::string CodeGenerator::get_register_name(const Register& reg)
 
 void CodeGenerator::emit_load_into(int offset, const std::string& register_label)
 {
+	if (offset < 0)
+	{
+
+		Register sp = this->allocator.allocate();
+		this->emit_raw("move ");
+		this->emit_register_use(sp);
+		this->emit_raw(" sp \n");
+
+		// offsets are off-by-one
+		// -1 is actually 0
+
+		this->emit_raw("move sp ");
+		this->emit_raw(std::to_string(-offset));
+		this->emit_raw("\n");
+
+		this->emit_raw("peek ");
+		this->emit_raw(register_label);
+		this->emit_raw("\n");
+
+		this->emit_raw("move sp ");
+		this->emit_register_use(sp);
+		this->emit_raw("\n");
+
+		return;
+	}
+
 	if (offset == 0)
 	{
 		this->emit_raw("peek ");
@@ -470,6 +512,32 @@ void CodeGenerator::emit_load_into(int offset, Register* reg)
 
 void CodeGenerator::emit_store_into(int offset, const Register& source)
 {
+	if (offset < 0)
+	{
+		printf("storing into stack\n");
+		Register sp = this->allocator.allocate();
+		this->emit_raw("move ");
+		this->emit_register_use(sp);
+		this->emit_raw(" sp \n");
+
+		// offsets are off-by-one
+		// -1 is actually 0
+
+		this->emit_raw("move sp ");
+		this->emit_raw(std::to_string((-offset) - 1));
+		this->emit_raw("\n");
+
+		this->emit_raw("push ");
+		this->emit_register_use(source);
+		this->emit_raw("\n");
+
+		this->emit_raw("move sp ");
+		this->emit_register_use(sp);
+		this->emit_raw("\n");
+
+		return;
+	}
+
 	if (offset == 0)
 	{
 		this->emit_raw("sub sp sp 1\n");
@@ -671,7 +739,7 @@ void CodeGenerator::visit_stmt(std::unique_ptr<Stmt>& stmt)
 {
 	if (this->pass == Pass::GlobalLinkage)
 	{
-		if (typeid(*stmt) == typeid(Stmt::Variable))
+		if (typeid(*stmt) == typeid(Stmt::Static))
 		{
 			stmt->accept(*this);
 		}
@@ -679,7 +747,7 @@ void CodeGenerator::visit_stmt(std::unique_ptr<Stmt>& stmt)
 	}
 	if (this->pass == Pass::FunctionLinkage)
 	{
-		if (!this->env->is_in_function() && typeid(*stmt) == typeid(Stmt::Variable))
+		if (typeid(*stmt) == typeid(Stmt::Static))
 		{
 			return;
 		}
@@ -714,6 +782,16 @@ void* CodeGenerator::visitStmtAsm(Stmt::Asm& expr)
 
 void* CodeGenerator::visitStmtPrint(Stmt::Print& expr)
 {
+	return nullptr;
+}
+
+void* CodeGenerator::visitStmtStatic(Stmt::Static& expr)
+{
+	Register value = this->visit_expr(expr.var->initalizer);
+	this->emit_raw("push ");
+	this->emit_register_use(value);
+	this->emit_raw("\n");
+	this->env->define_static(expr.var->name.lexeme, 1);
 	return nullptr;
 }
 

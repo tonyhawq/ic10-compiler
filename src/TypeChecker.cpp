@@ -810,6 +810,11 @@ void* TypeChecker::visitStmtPrint(Stmt::Print& stmt)
 	return nullptr;
 }
 
+void* TypeChecker::visitStmtStatic(Stmt::Static& expr)
+{
+	return expr.var->accept(*this);
+}
+
 void* TypeChecker::visitStmtVariable(Stmt::Variable& stmt)
 {
 	if (this->current_pass == Pass::Linking)

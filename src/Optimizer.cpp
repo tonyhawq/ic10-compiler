@@ -232,6 +232,11 @@ void* Optimizer::visitStmtPrint(Stmt::Print& stmt)
 	return nullptr;
 }
 
+void* Optimizer::visitStmtStatic(Stmt::Static& stmt)
+{
+	return stmt.var->accept(*this);
+}
+
 void* Optimizer::visitStmtVariable(Stmt::Variable& stmt)
 {
 	FOLD_INTO(stmt.initalizer, stmt.initalizer->accept(*this));
