@@ -171,7 +171,8 @@ public:
 	TypeCheckedProgram check();
 	void evaluate(std::vector<std::unique_ptr<Stmt>>& statements);
 	void error(const Token& token, const std::string& message);
-
+	
+	static bool is_intrinsic(const TypeName& type);
 	static bool can_initalize(const TypeName& to, const TypeName& from);
 	static bool can_assign(const TypeName& to, const TypeName& from);
 
@@ -189,6 +190,7 @@ public:
 	virtual void* visitExprAssignment(Expr::Assignment& expr) override;
 	virtual void* visitExprCall(Expr::Call& expr) override;
 	virtual void* visitExprLogical(Expr::Logical& expr) override;
+	virtual void* visitExprDeviceLoad(Expr::DeviceLoad& expr) override;
 
 	virtual void* visitStmtExpression(Stmt::Expression& stmt) override;
 	virtual void* visitStmtAsm(Stmt::Asm& stmt) override;
@@ -199,6 +201,12 @@ public:
 	virtual void* visitStmtFunction(Stmt::Function& expr) override;
 	virtual void* visitStmtReturn(Stmt::Return& expr) override;
 	virtual void* visitStmtStatic(Stmt::Static& expr) override;
+	virtual void* visitStmtDeviceSet(Stmt::DeviceSet& expr) override;
+
+	static TypeName t_number;
+	static TypeName t_boolean;
+	static TypeName t_string;
+	static TypeName t_void;
 private:
 	bool seen_main = false;
 

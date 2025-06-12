@@ -193,6 +193,10 @@ std::unique_ptr<Stmt> Parser::parse_statement()
 	{
 		return this->parse_print_statement();
 	}
+	if (this->match({ TokenType::DSET }))
+	{
+		return this->parse_device_set_statement();
+	}
 	if (this->match({ TokenType::IF }))
 	{
 		return this->parse_if();
@@ -332,6 +336,16 @@ std::unique_ptr<Stmt> Parser::parse_print_statement()
 	std::shared_ptr<Expr> expression = this->parse_expression();
 	this->consume(TokenType::SEMICOLON, "Expected semicolon after print literal.");
 	return std::make_unique<Stmt::Print>(expression);
+}
+
+std::unique_ptr<Stmt> Parser::parse_device_set_statement()
+{
+	Token token = this->peek_previous();
+	std::shared_ptr<Expr> device = this->parse_expression();
+	Token logic_type = this->consume(TokenType::STRING, "Expected string for device set logic type.");
+	std::shared_ptr<Expr> value = this->parse_expression();
+	this->consume(TokenType::SEMICOLON, "Expected ;");
+	return std::make_unique<Stmt::DeviceSet>(token, device, logic_type, value);
 }
 
 std::unique_ptr<Stmt> Parser::parse_asm_statement()
@@ -575,6 +589,10 @@ std::shared_ptr<Expr> Parser::parse_primary()
 	{
 		return std::make_shared<Expr::Variable>(this->peek_previous());
 	}
+	if (this->match({ TokenType::DLOAD }))
+	{
+		return this->helper_parse_device_load();
+	}
 	if (this->match({ TokenType::LEFT_PAREN }))
 	{
 		std::shared_ptr<Expr> expression = this->parse_expression();
@@ -585,9 +603,21 @@ std::shared_ptr<Expr> Parser::parse_primary()
 	return nullptr;
 }
 
+std::shared_ptr<Expr> Parser::helper_parse_device_load()
+{
+	std::shared_ptr<Expr> device = this->parse_expression();
+	Token logic_type = this->consume(TokenType::STRING, "Expected string for device load logic type.");
+	TypeName operation_type = TypeName("number");
+	if (this->match({ TokenType::ARROW }))
+	{
+		operation_type = this->parse_type();
+	}
+	return std::make_shared<Expr::DeviceLoad>(device, logic_type, operation_type);
+}
+
 void Parser::error(const Token& error_token, const std::string& message)
 {
-	this->compiler.error(error_token.line, message);
+	this->compiler.error(error_token.line, message + " (on token " + error_token.lexeme + ")");
 	throw ParseError();
 }
 

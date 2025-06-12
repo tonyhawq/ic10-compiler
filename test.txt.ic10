@@ -6,22 +6,3 @@ jr -2
 #Function definition for
 #main_return_void_params_
 push ra
-move r1 sp 
-move sp 1
-peek r0
-move sp r1
-move r1 2.000000
-sgt r0 r0 r1
-breqz r0 7
-#return statement for 
-#main_return_void_params_
-peek ra
-sub sp sp 1
-push 0
-j ra
-#return statement for 
-#main_return_void_params_
-peek ra
-sub sp sp 1
-push 0
-j ra

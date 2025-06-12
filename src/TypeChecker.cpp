@@ -2,6 +2,12 @@
 
 #include "Compiler.h"
 
+
+TypeName TypeChecker::t_number = TypeName("number");
+TypeName TypeChecker::t_boolean = TypeName("boolean");
+TypeName TypeChecker::t_string = TypeName("string");
+TypeName TypeChecker::t_void = TypeName("void");
+
 #define CHECK_IS_FUNCTION_OR_ERROR(reason) do {if (!this->is_function) {throw std::runtime_error(std::string("TYPECHECK ERROR: !ATTEMPTED TO GET ") + std::string(reason) + " OF NON FUNCTION TYPE " + this->type.type_name());}} while(0)
 
 TypeName& TypeID::return_type()
@@ -331,7 +337,7 @@ TypeChecker::Operator::ReturnType TypeChecker::Operator::return_type(const std::
 }
 
 TypeChecker::OperatorOverload::Addressof::Addressof()
-	:OperatorOverload(TypeName("void"), {})
+	:OperatorOverload(TypeChecker::t_void, {})
 {}
 
 TypeChecker::OperatorOverload::Addressof::~Addressof()
@@ -353,7 +359,7 @@ TypeChecker::Operator::ReturnType TypeChecker::OperatorOverload::Addressof::retu
 }
 
 TypeChecker::OperatorOverload::Deref::Deref()
-	:OperatorOverload(TypeName("void"), {})
+	:OperatorOverload(TypeChecker::t_void, {})
 {}
 
 TypeChecker::OperatorOverload::Deref::~Deref()
@@ -434,14 +440,8 @@ TypeChecker::TypeChecker(Compiler& compiler, std::vector<std::unique_ptr<Stmt>> 
 	:compiler(compiler), env(nullptr), current_pass(Pass::Linking), program(std::move(statements))
 {
 	env = this->program.env().root();
-	TypeName t_number("number");
-	TypeName t_string("string");
-	TypeName t_Device("Device");
-	TypeName t_boolean("boolean");
-	TypeName t_void("void");
 	this->types.emplace(t_number, TypeID{ t_number, false, nullptr, nullptr, nullptr });
 	this->types.emplace(t_string, TypeID{ t_string, false, nullptr, nullptr, nullptr });
-	this->types.emplace(t_Device, TypeID{ t_Device, false, nullptr, nullptr, nullptr });
 	this->types.emplace(t_boolean, TypeID{ t_boolean, false, nullptr, nullptr, nullptr });
 	this->types.emplace(t_void, TypeID{ t_void, false, nullptr, nullptr, nullptr });
 	
@@ -487,7 +487,6 @@ TypeChecker::TypeChecker(Compiler& compiler, std::vector<std::unique_ptr<Stmt>> 
 	this->define_operator(TokenType::BAR, "op_deref", {
 		new OperatorOverload::Deref()
 		});
-	this->define_library_function("dopen", t_Device, { t_number });
 	this->define_library_function("yield", t_void, {});
 }
 
@@ -791,6 +790,33 @@ void* TypeChecker::visitExprCall(Expr::Call& expr)
 	return type;
 }
 
+void* TypeChecker::visitExprDeviceLoad(Expr::DeviceLoad& expr)
+{
+	std::unique_ptr<TypeName> device = this->accept(*expr.device);
+	if (device)
+	{
+		if (!device->compile_time)
+		{
+			this->error(expr.logic_type, "Cannot perform a dload operation on a non-compile time device.");
+		}
+		if (!device->const_unqualified_equals(this->t_number))
+		{
+			this->error(expr.logic_type, std::string("Cannot perform a dload operation on a non-number device (device type was ") + device->type_name());
+		}
+	}
+	if (!expr.logic_type.literal.is_string())
+	{
+		this->error(expr.logic_type, "A dload operation requires a string literal for the logic type.");
+	}
+	if (!this->types.count(expr.operation_type))
+	{
+		this->error(expr.logic_type, std::string("No type exists with name ") + expr.operation_type.type_name());
+		return nullptr;
+	}
+	expr.type = expr.operation_type;
+	return new TypeName(expr.type);
+}
+
 void* TypeChecker::visitExprLogical(Expr::Logical& expr)
 {
 	std::unique_ptr<TypeName> left_type = this->accept(*expr.left);
@@ -799,7 +825,7 @@ void* TypeChecker::visitExprLogical(Expr::Logical& expr)
 	{
 		return nullptr;
 	}
-	if (!left_type->const_unqualified_equals(TypeName("boolean")) || !right_type->const_unqualified_equals(TypeName("boolean")))
+	if (!left_type->const_unqualified_equals(this->t_void) || !right_type->const_unqualified_equals(this->t_boolean))
 	{
 		this->error(expr.op, std::string("Attempted to logically compare ") + left_type->type_name() + " with " +
 			right_type->type_name() + " (requires boolean operations)");
@@ -807,6 +833,49 @@ void* TypeChecker::visitExprLogical(Expr::Logical& expr)
 	}
 	expr.type = *left_type;
 	return left_type.release();
+}
+
+bool TypeChecker::is_intrinsic(const TypeName& type)
+{
+	return type.const_unqualified_equals(TypeChecker::t_number) ||
+		type.const_unqualified_equals(TypeChecker::t_boolean) ||
+		type.const_unqualified_equals(TypeChecker::t_string);
+}
+
+void* TypeChecker::visitStmtDeviceSet(Stmt::DeviceSet& expr)
+{
+	if (this->current_pass == Pass::Linking)
+	{
+		return nullptr;
+	}
+	std::unique_ptr<TypeName> device = this->accept(*expr.device);
+	if (device)
+	{
+		if (!device->compile_time)
+		{
+			this->error(expr.token, "A dset operation requires a compile-time known device.");
+		}
+		if (!device->const_unqualified_equals(this->t_number))
+		{
+			this->error(expr.token, "A dset operation requires a numerical device id.");
+		}
+	}
+	if (!expr.logic_type.literal.is_string())
+	{
+		this->error(expr.logic_type, "A dset operation requires a string literal for the logic type.");
+	}
+	std::unique_ptr<TypeName> value_type = this->accept(*expr.value);
+	if (value_type)
+	{
+		if (!this->is_intrinsic(*value_type))
+		{
+			this->error(expr.token, "Cannot set device value to a non-intrinsic type (number, boolean).");
+		}
+		if (*value_type != this->t_number && *value_type != this->t_boolean)
+		{
+			this->error(expr.token, std::string("Cannot set device value to a value of type ") + value_type->type_name());
+		}
+	}
 }
 
 void* TypeChecker::visitStmtExpression(Stmt::Expression& stmt)
@@ -855,7 +924,7 @@ void* TypeChecker::visitStmtVariable(Stmt::Variable& stmt)
 		return nullptr;
 	}
 	TypeID& underlying = this->types.at(stmt.type.underlying());
-	if (underlying.type == TypeName("void"))
+	if (underlying.type == this->t_void)
 	{
 		this->error(stmt.name, std::string("Attempted to declare variable ") + stmt.name.lexeme + " as void.");
 		return nullptr;
@@ -913,7 +982,7 @@ void* TypeChecker::visitStmtIf(Stmt::If& stmt)
 		return nullptr;
 	}
 	bool had_error = false;
-	if (!condition_type->const_unqualified_equals(TypeName("boolean")))
+	if (!condition_type->const_unqualified_equals(this->t_boolean))
 	{
 		this->error(stmt.token, "Attempted to branch on a non-boolean condition.");
 		had_error = true;
@@ -946,7 +1015,7 @@ void* TypeChecker::visitStmtReturn(Stmt::Return& expr)
 		return nullptr;
 	}
 	TypeID& function_type = this->types.at(info->type());
-	if (function_type.return_type().underlying() == TypeName("void"))
+	if (function_type.return_type().underlying() == this->t_void)
 	{
 		if (expr.value)
 		{
@@ -986,7 +1055,7 @@ void* TypeChecker::visitStmtFunction(Stmt::Function& expr)
 			{
 				this->error(expr.name, "Entry point (main) cannot have any arguments.");
 			}
-			if (expr.return_type != TypeName("void"))
+			if (expr.return_type != this->t_void)
 			{
 				this->error(expr.name, "Entry point (main) must return void.");
 			}

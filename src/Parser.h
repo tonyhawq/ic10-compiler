@@ -43,6 +43,8 @@ private:
 	std::shared_ptr<Expr> parse_call();
 	std::shared_ptr<Expr> parse_primary();
 
+	std::shared_ptr<Expr> helper_parse_device_load();
+
 	std::shared_ptr<Expr> finish_parse_call(std::shared_ptr<Expr> expression);
 
 	std::unique_ptr<Stmt> parse_if();
@@ -54,6 +56,7 @@ private:
 	std::unique_ptr<Stmt> parse_declaration();
 	std::unique_ptr<Stmt> parse_asm_statement();
 	std::unique_ptr<Stmt> parse_print_statement();
+	std::unique_ptr<Stmt> parse_device_set_statement();
 	std::unique_ptr<Stmt> parse_while_statement();
 	std::unique_ptr<Stmt> parse_for_statement();
 	std::unique_ptr<Stmt> parse_return_statement();

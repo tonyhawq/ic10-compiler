@@ -5,7 +5,8 @@
 
 #include "Token.h"
 
-#define NODE_VISIT_IMPL(base_name, node_name) virtual void* accept(base_name::Visitor& visitor) override {return visitor.visit##base_name##node_name(*this);}
+#define NODE_VISIT_IMPL(base_name, node_name) virtual void* accept(base_name::Visitor& visitor) override {return visitor.visit##base_name##node_name(*this);}\
+virtual std::string to_string() override {return #node_name;}
 
 #define UNDEFINED_TYPE TypeName("undefined")
 #define VOID_TYPE TypeName("void")
@@ -70,7 +71,8 @@ struct Expr
 	virtual void* accept(Visitor&) = 0;
 	
 	Expr(TypeName type) :type(type) {};
-	
+	virtual std::string to_string() { return "Expr"; }
+
 	TypeName type;
 };
 
@@ -114,6 +116,7 @@ struct Stmt
 	bool is();
 
 	virtual void* accept(Stmt::Visitor&) = 0;
+	virtual std::string to_string() { return "Stmt"; }
 };
 
 template <typename T>
@@ -137,6 +140,17 @@ public:
 	virtual void* visitStmtStatic(Stmt::Static& expr) { return nullptr; }
 	virtual void* visitStmtDeviceSet(Stmt::DeviceSet& expr) { return nullptr; }
 private:
+};
+
+struct Stmt::DeviceSet : public Stmt
+{
+	DeviceSet(Token token, std::shared_ptr<Expr> device, Token logic_type, std::shared_ptr<Expr> value) :token(token), device(device), logic_type(logic_type),
+		value(value) {};
+	Token token;
+	std::shared_ptr<Expr> device;
+	Token logic_type;
+	std::shared_ptr<Expr> value;
+	NODE_VISIT_IMPL(Stmt, DeviceSet)
 };
 
 struct Stmt::Static : public Stmt
@@ -229,9 +243,11 @@ struct Stmt::Asm : public Stmt
 
 struct Expr::DeviceLoad : public Expr
 {
-	DeviceLoad();
-	Token logic_type;
+	DeviceLoad(std::shared_ptr<Expr> device, Token logic_type, TypeName operation_type) :device(device), logic_type(logic_type), operation_type(operation_type),
+		Expr(UNDEFINED_TYPE) {};
 	std::shared_ptr<Expr> device;
+	Token logic_type;
+	TypeName operation_type;
 	NODE_VISIT_IMPL(Expr, DeviceLoad)
 };
 
