@@ -85,6 +85,12 @@ void StackEnvironment::forget(const std::string& name)
 			{
 				this->variable_list[i]->offset -= size;
 			}
+			this->m_frame_size -= size;
+			this->variable_list.erase(this->variable_list.begin() + id);
+			for (size_t i = 0; i < this->variable_list.size(); i++)
+			{
+				this->variable_list[i]->id = i;
+			}
 			return;
 		}
 	}
@@ -119,6 +125,11 @@ void StackEnvironment::set_frame_size(int value)
 int StackEnvironment::frame_size() const
 {
 	return this->m_frame_size;
+}
+
+const std::vector<StackVariable*>& StackEnvironment::see_variables() const
+{
+	return this->variable_list;
 }
 
 StackEnvironment* StackEnvironment::spawn()
@@ -761,11 +772,21 @@ void* CodeGenerator::visitExprCall(Expr::Call& expr)
 		throw std::runtime_error("Non-static functions not implemented yet.");
 	}
 
+	printf("BEFORE:\n");
+	for (const auto& val : this->env->see_variables())
+	{
+		printf("   - var %s has offset %i\n", val->name.c_str(), val->offset);
+	}
+
 	this->comment("Storing register values");
 	this->store_register_values();
-
-	// pushes all arguments
-	// then pushes return address
+	this->comment("Stored.");
+	
+	printf("DURING:\n");
+	for (const auto& val : this->env->see_variables())
+	{
+		printf("   - var %s has offset %i\n", val->name.c_str(), val->offset);
+	}
 
 	for (auto& arg : expr.arguments)
 	{
@@ -774,11 +795,12 @@ void* CodeGenerator::visitExprCall(Expr::Call& expr)
 		this->emit_register_use(loaded);
 		this->emit_raw("\n");
 	}
-	
+
 	this->emit_raw("jal ");
 	this->emit_raw(name);
 	this->emit_raw("\n");
 
+	this->comment("Getting return value");
 	Register return_value = this->allocator.allocate();
 	this->emit_raw("pop ");
 	this->emit_register_use(return_value);
@@ -786,6 +808,13 @@ void* CodeGenerator::visitExprCall(Expr::Call& expr)
 
 	this->comment("Restoring register values");
 	this->restore_register_values();
+	this->comment("Restored.");
+
+	printf("AFTER:\n");
+	for (const auto& val : this->env->see_variables())
+	{
+		printf("   - var %s has offset %i\n", val->name.c_str(), val->offset);
+	}
 	
 	return return_value.release();
 }

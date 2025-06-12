@@ -21,9 +21,12 @@ peek ra
 sub sp sp 2
 push r1
 j ra
+#return statement for 
+#fib_return_number_params_@number_n
 #calling function
 #fib
 #Storing register values
+#Stored.
 sub sp sp 1
 peek r0
 add sp sp 1
@@ -31,33 +34,30 @@ move r1 1.000000
 sub r0 r0 r1
 push r0
 jal 7
+#Getting return value
 pop r0
 #Restoring register values
-push r0
+#Restored.
 #calling function
 #fib
 #Storing register values
+push r0
+#Stored.
 sub sp sp 2
-peek r0
-add sp sp 2
-move r1 2.000000
-sub r0 r0 r1
-push r0
-jal 7
-pop r0
-#Restoring register values
-push r0
-#return statement for 
-#fib_return_number_params_@number_n
-sub sp sp 1
-peek r0
-add sp sp 1
 peek r1
-add r0 r0 r1
-sub sp sp 2
-peek ra
 add sp sp 2
-sub sp sp 4
+move r2 2.000000
+sub r1 r1 r2
+push r1
+jal 7
+#Getting return value
+pop r1
+#Restoring register values
+pop r0
+#Restored.
+add r0 r0 r1
+peek ra
+sub sp sp 2
 push r0
 j ra
 #Function definition for
@@ -76,11 +76,14 @@ move sp r1
 #calling function
 #fib
 #Storing register values
+#Stored.
 move r0 5.000000
 push r0
 jal 7
+#Getting return value
 pop r0
 #Restoring register values
+#Restored.
 push r0
 yield
 #return statement for 

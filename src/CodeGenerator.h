@@ -36,6 +36,8 @@ public:
 	bool is_in_function() const;
 	const std::string& function_name() const;
 
+	const std::vector<StackVariable*>& see_variables() const;
+
 	StackEnvironment* pop_to_function();
 	StackEnvironment* spawn();
 	StackEnvironment* spawn_in_function(const std::string& name);
