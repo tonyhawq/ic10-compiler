@@ -122,6 +122,7 @@ private:
 	void emit_store_into(int offset, const Register& source);
 	void emit_load_into(int offset, const std::string& register_label);
 	void emit_load_into(int offset, Register* reg);
+
 	Placeholder emit_placeholder();
 	void emit_replace_placeholder(const Placeholder& placeholder, const std::string& val);
 

@@ -1,21 +1,16 @@
-number iter = 0;
+number iter = 42;
 
-function fib(number n) -> number
-{
-	if (n < 2)
-	{
-		return n;
-	}
-	return fib(n - 1) + fib(n - 2);
-}
-
-function main() -> void
+function increment(number _) -> void
 {
 	while (true)
 	{
 		iter = iter + 1;
-		number val = fib(iter);
-		asm "s db Setting r0";
 		asm "yield";
 	}
+}
+
+function main() -> void
+{
+	increment(80085);
+	return;
 }

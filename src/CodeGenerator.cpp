@@ -6,12 +6,10 @@ std::unique_ptr<StackVariable> StackEnvironment::resolve(const std::string& name
 	const auto& val = this->variables.find(name);
 	if (val != this->variables.end())
 	{
-		printf("resolved %s\n", name.c_str());
 		return std::make_unique<StackVariable>(this->variables.at(name));
 	}
 	if (this->parent)
 	{
-		printf("While resolving %s added %i because of frame size\n", name.c_str(), this->m_frame_size);
 		std::unique_ptr<StackVariable> var = this->parent->resolve(name);
 		var->offset += this->m_frame_size;
 		return var;
@@ -244,11 +242,12 @@ std::string CodeGenerator::generate()
 			this->visit_stmt(stmt);
 		}
 		
-		this->emit_raw("push -1\n");
 		this->emit_raw("jal ");
 		this->emit_raw(this->m_program.env().root()->get_variable(Identifier("main"))->full_type().mangled_name());
 		this->emit_raw("\n");
-		this->emit_raw("jr -1\n");
+
+		this->emit_raw("sub sp sp 1\n");
+		this->emit_raw("jr -2\n");
 
 		printf("entering function linkage\n");
 
@@ -583,8 +582,11 @@ void* CodeGenerator::visitStmtFunction(Stmt::Function& expr)
 		this->env->define(param.name.lexeme, 1);
 	}
 
-	// then get return address
+	// then define return address of previous function
 	this->env->define("@return", 1);
+
+	// this is loaded into @return
+	this->emit_raw("push ra\n");
 
 	for (auto& stmt : expr.body)
 	{
@@ -626,7 +628,6 @@ void* CodeGenerator::visitExprCall(Expr::Call& expr)
 		this->emit_register_use(loaded);
 		this->emit_raw("\n");
 	}
-	this->emit_raw("push ra\n");
 	
 	this->emit_raw("jal ");
 	this->emit_raw(name);
@@ -672,14 +673,12 @@ void CodeGenerator::visit_stmt(std::unique_ptr<Stmt>& stmt)
 	{
 		if (typeid(*stmt) == typeid(Stmt::Variable))
 		{
-			printf("accepting variable decl\n");
 			stmt->accept(*this);
 		}
 		return;
 	}
 	if (this->pass == Pass::FunctionLinkage)
 	{
-		printf("accepting any stmt\n");
 		if (!this->env->is_in_function() && typeid(*stmt) == typeid(Stmt::Variable))
 		{
 			return;
@@ -739,7 +738,8 @@ void* CodeGenerator::visitStmtBlock(Stmt::Block& expr)
 		// no need to emit code after a return statement (will never be executed)
 		if (stmt->is<Stmt::Return>())
 		{
-			return nullptr;
+			this->pop_env();
+			return nullptr;;
 		}
 	}
 	if (this->env->frame_size() > 0)
