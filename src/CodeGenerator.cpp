@@ -1043,7 +1043,7 @@ void* CodeGenerator::visitStmtWhile(Stmt::While& expr)
 	int line = this->current_line();
 	Register condition = this->visit_expr(expr.condition);
 	
-	this->emit_raw("brgtz ");
+	this->emit_raw("brlez ");
 	this->emit_register_use(condition);
 	this->emit_raw(" ");
 	Placeholder placeholder = this->emit_placeholder();
