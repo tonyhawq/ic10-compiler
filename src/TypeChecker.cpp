@@ -868,6 +868,7 @@ void* TypeChecker::visitStmtDeviceSet(Stmt::DeviceSet& expr)
 			this->error(expr.token, std::string("Cannot set device value to a value of type ") + value_type->type_name());
 		}
 	}
+	return nullptr;
 }
 
 void* TypeChecker::visitStmtExpression(Stmt::Expression& stmt)

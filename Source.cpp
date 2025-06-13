@@ -2,9 +2,15 @@
 
 #include "src/Compiler.h"
 
-int main()
+int main(int argc, char* argv[])
 {
 	Compiler compiler;
-	compiler.compile("test.txt");
+	if (argc <= 1)
+	{
+		compiler.compile("test.txt");
+		return 0;
+	}
+	char* arg = argv[1];
+	compiler.compile(arg);
 	return 0;
 }

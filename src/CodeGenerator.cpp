@@ -414,8 +414,6 @@ std::string CodeGenerator::generate()
 		this->emit_raw("sub sp sp 1\n");
 		this->emit_raw("jr -2\n");
 
-		printf("entering function linkage\n");
-
 		this->pass = Pass::FunctionLinkage;
 		for (auto& stmt : this->m_program.statements())
 		{
@@ -437,7 +435,6 @@ std::string CodeGenerator::generate()
 		found = found + 1;
 		size_t end = this->code.find(':', found);
 		std::string identifier = this->code.substr(found, end - found);
-		printf("%s\n", identifier.c_str());
 		this->code.erase(found, end - found + 1);
 		int line = std::count(this->code.begin(), this->code.begin() + found, '\n');
 		find_and_replace_in(this->code, identifier, std::to_string(line));
@@ -633,8 +630,6 @@ void CodeGenerator::emit_load_into(int offset, const std::string& register_label
 		static number z = -42;           # offset 0 -> -1 # push 3 peek 4
 		*/
 
-		printf("For loading offset %i moving sp to %i\n", offset, this->top_env.frame_size() + offset + 1);
-
 		this->emit_raw("move sp ");
 		this->emit_raw(std::to_string(this->top_env.frame_size() + offset + 1));
 		this->emit_raw("\n");
@@ -677,7 +672,6 @@ void CodeGenerator::emit_store_into(int offset, const RegisterOrLiteral& source)
 {
 	if (offset < 0)
 	{
-		printf("storing into stack\n");
 		Register sp = this->allocator.allocate();
 		this->emit_raw("move ");
 		this->emit_register_use(sp);
@@ -731,7 +725,6 @@ void* CodeGenerator::visitExprVariable(Expr::Variable& expr)
 	{
 		throw std::runtime_error("Attempt to use undefined variable.");
 	}
-	printf("loading var %s\n", expr.name.lexeme.c_str());
 	this->emit_load_into(var->offset, &reg);
 	return new RegisterOrLiteral(reg);
 }
@@ -885,22 +878,10 @@ void* CodeGenerator::visitExprCall(Expr::Call& expr)
 		throw std::runtime_error("Non-static functions not implemented yet.");
 	}
 
-	printf("BEFORE:\n");
-	for (const auto& val : this->env->see_variables())
-	{
-		printf("   - var %s has offset %i\n", val->name.c_str(), val->offset);
-	}
-
 	this->comment("Storing register values");
 	this->store_register_values();
 	this->comment("Stored.");
 	
-	printf("DURING:\n");
-	for (const auto& val : this->env->see_variables())
-	{
-		printf("   - var %s has offset %i\n", val->name.c_str(), val->offset);
-	}
-
 	for (auto& arg : expr.arguments)
 	{
 		std::unique_ptr<RegisterOrLiteral> loaded = this->visit_expr(arg);
@@ -922,12 +903,6 @@ void* CodeGenerator::visitExprCall(Expr::Call& expr)
 	this->comment("Restoring register values");
 	this->restore_register_values();
 	this->comment("Restored.");
-
-	printf("AFTER:\n");
-	for (const auto& val : this->env->see_variables())
-	{
-		printf("   - var %s has offset %i\n", val->name.c_str(), val->offset);
-	}
 	
 	return return_value.release();
 }

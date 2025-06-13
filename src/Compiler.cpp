@@ -6,6 +6,7 @@
 
 void Compiler::compile(const std::string& path)
 {
+	Timer total_timer;
 	Timer timer;
 	std::ifstream file;
 	file.open(path.c_str());
@@ -13,47 +14,68 @@ void Compiler::compile(const std::string& path)
 	{
 		throw std::runtime_error(std::string("File ") + path + " could not be opened.");
 	}
+	printf("Compiling source file %s\n", path.c_str());
 	std::stringstream temp;
 	temp << file.rdbuf();
-	printf("Scanning...\n");
+	this->info("Scanning...");
 	timer.start();
 	Scanner scanner(*this, temp.str());
 	std::vector<Token> tokens = scanner.scan();
-	printf("Scanning took %fms\n", timer.start() * 1000.0);
-	printf("Parsing...\n");
+	this->info(std::string("Scanning took ") + std::to_string(timer.start() * 1000.0) + "ms.");
+	this->info("Parsing...");
 	Parser parser(*this, std::move(tokens));
 	std::vector<std::unique_ptr<Stmt>> program = parser.parse();
-	printf("Parsing took %fms\n", timer.start() * 1000.0);
-	printf("Typechecking...\n");
+	this->info(std::string("Parsing took ") + std::to_string(timer.start() * 1000.0) + "ms.");
+	this->info("Typechecking...");
 	TypeChecker checker(*this, std::move(program));
 	TypeCheckedProgram env = checker.check();
-	printf("Typing took %fms\n", timer.start() * 1000.0);
+	this->info(std::string("Typing took ") + std::to_string(timer.start() * 1000.0) + "ms.");
 	if (this->had_error)
 	{
+		printf("Errors detected.\n");
 		printf("Aborting before code generation.\n");
 		return;
 	}
-	printf("Optimizing...\n");
+	this->info("Optimizing...");
 	Optimizer optimizer(*this, env);
 	optimizer.optimize();
-	printf("Optimizing took %fms\n", timer.start() * 1000.0);
-	printf("Generating code...\n");
+	this->info(std::string("Optimizing took ") + std::to_string(timer.start() * 1000.0) + "ms.");
+	this->info("Generating code...");
 	CodeGenerator generator(*this, env);
 	std::string code = generator.generate();
-	printf("Code generation took %fms\n", timer.start() * 1000.0);
+	this->info(std::string("Code generation took ") + std::to_string(timer.start() * 1000.0) + "ms.");
 	std::ofstream generated_file;
-	generated_file.open((path + ".ic10").c_str());
+	std::string output = (path + ".ic10").c_str();
+	generated_file.open(output);
 	generated_file << code;
+	printf("Wrote to %s\n", output.c_str());
 	generated_file.close();
+	printf("Compiling took %fms.\n", total_timer.time() * 1000.0);
 }
 
-void Compiler::error(int line, std::string message)
+void Compiler::error(int line, const std::string& message)
 {
 	this->had_error = true;
 	this->report(line, "", message);
 }
 
-void Compiler::report(int line, std::string where, std::string message)
+void Compiler::report(int line, const std::string& where, const std::string& message)
 {
-	printf("Error on line %i: %s %s\n", line, where.c_str(), message.c_str());
+	printf("ERROR: on line %i: %s %s\n", line, where.c_str(), message.c_str());
+}
+
+void Compiler::info(const std::string& message)
+{
+	if (this->level >= ReportingLevel::All)
+	{
+		printf("    (i): %s\n", message.c_str());
+	}
+}
+
+void Compiler::warn(int line, const std::string& warning)
+{
+	if (this->level >= ReportingLevel::Warnings)
+	{
+		printf("  WARN: on line %i: %s\n", line, warning.c_str());
+	}
 }

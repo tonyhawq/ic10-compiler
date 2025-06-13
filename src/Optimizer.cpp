@@ -72,19 +72,35 @@ void* Optimizer::visitExprBinary(Expr::Binary& expr)
 			{
 			case TokenType::PLUS:
 				result = left + right;
-				printf("emitting literal when simplifying %f + %f on line %i: %f\n", left, right, expr.op.line, result);
+				this->compiler.info(std::string("emitting literal when simplifying ") +
+					std::to_string(left) + " + " +
+					std::to_string(right) + " on line " +
+					std::to_string(expr.op.line) + ": " +
+					std::to_string(result));
 				break;
 			case TokenType::MINUS:
 				result = left - right;
-				printf("emitting literal when simplifying %f - %f on line %i: %f\n", left, right, expr.op.line, result);
+				this->compiler.info(std::string("emitting literal when simplifying ") +
+					std::to_string(left) + " - " +
+					std::to_string(right) + " on line " +
+					std::to_string(expr.op.line) + ": " +
+					std::to_string(result));
 				break;
 			case TokenType::STAR:
 				result = left * right;
-				printf("emitting literal when simplifying %f * %f on line %i: %f\n", left, right, expr.op.line, result);
+				this->compiler.info(std::string("emitting literal when simplifying ") +
+					std::to_string(left) + " * " +
+					std::to_string(right) + " on line " +
+					std::to_string(expr.op.line) + ": " +
+					std::to_string(result));
 				break;
 			case TokenType::SLASH:
 				result = left / right;
-				printf("emitting literal when simplifying %f / %f on line %i: %f\n", left, right, expr.op.line, result);
+				this->compiler.info(std::string("emitting literal when simplifying ") +
+					std::to_string(left) + " / " +
+					std::to_string(right) + " on line " +
+					std::to_string(expr.op.line) + ": " +
+					std::to_string(result));
 				break;
 			default:
 				throw std::runtime_error("OPTIMIZER ERROR: !ARITHMETIC TOKEN WAS NOT OF ARITHMETIC TYPE!");
@@ -101,12 +117,20 @@ void* Optimizer::visitExprBinary(Expr::Binary& expr)
 			{
 			case TokenType::EQUAL_EQUAL:
 				result = left == right;
-				printf("emitting literal when simplifying %s == %s on line %i: %s\n", BOOL_TO_STR(left), BOOL_TO_STR(right), expr.op.line, BOOL_TO_STR(result));
+				this->compiler.info(std::string("Emitting literal when simplifying ") +
+					BOOL_TO_STR(left) + " == " +
+					BOOL_TO_STR(right) + " on line " +
+					std::to_string(expr.op.line) + ": " +
+					BOOL_TO_STR(result));
 				return emit_boolean_literal(expr.op, result);
 				break;
 			case TokenType::BANG_EQUAL:
 				result = left != right;
-				printf("emitting literal when simplifying %s != %s on line %i: %s\n", BOOL_TO_STR(left), BOOL_TO_STR(right), expr.op.line, BOOL_TO_STR(result));
+				this->compiler.info(std::string("Emitting literal when simplifying ") +
+					BOOL_TO_STR(left) + " != " +
+					BOOL_TO_STR(right) + " on line " +
+					std::to_string(expr.op.line) + ": " +
+					BOOL_TO_STR(result));
 				return emit_boolean_literal(expr.op, result);
 				break;
 			default:
@@ -121,22 +145,46 @@ void* Optimizer::visitExprBinary(Expr::Binary& expr)
 			switch (expr.op.type)
 			{
 			case TokenType::EQUAL_EQUAL:
-				printf("emitting literal when simplifying %f == %f on line %i: %s\n", left, right, expr.op.line, (left == right) ? "true" : "false");
+				this->compiler.info(std::string("Emitting literal when simplifying ") +
+					std::to_string(left) + " == " +
+					std::to_string(right) + " on line " +
+					std::to_string(expr.op.line) + ": " +
+					std::to_string(left == right));
 				return emit_boolean_literal(expr.op, left == right);
 			case TokenType::BANG_EQUAL:
-				printf("emitting literal when simplifying %f != %f on line %i: %s\n", left, right, expr.op.line, (left != right) ? "true" : "false");
+				this->compiler.info(std::string("Emitting literal when simplifying ") +
+					std::to_string(left) + " != " +
+					std::to_string(right) + " on line " +
+					std::to_string(expr.op.line) + ": " +
+					std::to_string(left != right));
 				return emit_boolean_literal(expr.op, left != right);
 			case TokenType::GREATER:
-				printf("emitting literal when simplifying %f > %f on line %i: %s\n", left, right, expr.op.line, (left > right) ? "true" : "false");
+				this->compiler.info(std::string("Emitting literal when simplifying ") +
+					std::to_string(left) + " > " +
+					std::to_string(right) + " on line " +
+					std::to_string(expr.op.line) + ": " +
+					std::to_string(left == right));
 				return emit_boolean_literal(expr.op, left > right);
 			case TokenType::GREATER_EQUAL:
-				printf("emitting literal when simplifying %f >= %f on line %i: %s\n", left, right, expr.op.line, (left >= right) ? "true" : "false");
+				this->compiler.info(std::string("Emitting literal when simplifying ") +
+					std::to_string(left) + " >= " +
+					std::to_string(right) + " on line " +
+					std::to_string(expr.op.line) + ": " +
+					std::to_string(left >= right));
 				return emit_boolean_literal(expr.op, left >= right);
 			case TokenType::LESS:
-				printf("emitting literal when simplifying %f < %f on line %i: %s\n", left, right, expr.op.line, (left < right) ? "true" : "false");
+				this->compiler.info(std::string("Emitting literal when simplifying ") +
+					std::to_string(left) + " < " +
+					std::to_string(right) + " on line " +
+					std::to_string(expr.op.line) + ": " +
+					std::to_string(left < right));
 				return emit_boolean_literal(expr.op, left < right);
 			case TokenType::LESS_EQUAL:
-				printf("emitting literal when simplifying %f <= %f on line %i: %s\n", left, right, expr.op.line, (left <= right) ? "true" : "false");
+				this->compiler.info(std::string("Emitting literal when simplifying ") +
+					std::to_string(left) + " <= " +
+					std::to_string(right) + " on line " +
+					std::to_string(expr.op.line) + ": " +
+					std::to_string(left <= right));
 				return emit_boolean_literal(expr.op, left <= right);
 			default:
 				throw std::runtime_error("OPTIMIZER ERROR: !ATTEMPTED TO FOLD BAD COMPARISON BETWEEN NUMBERS!");
@@ -196,18 +244,28 @@ void* Optimizer::visitExprLogical(Expr::Logical& expr)
 	{
 		Expr::Literal& literal_left = dynamic_cast<Expr::Literal&>(*expr.left);
 		Expr::Literal& literal_right = dynamic_cast<Expr::Literal&>(*expr.right);
-		if (literal_left.literal.literal.boolean && literal_right.literal.literal.boolean)
+		if (literal_left.literal.literal.is_boolean() && literal_right.literal.literal.is_boolean())
 		{
 			if (expr.op.type == TokenType::AND)
 			{
-				bool result = (*literal_left.literal.literal.boolean) && (*literal_right.literal.literal.boolean);
-				printf("emitting literal when simplifying AND between booleans on line %i: %s\n", expr.op.line, result ? "true" : "false");
+				bool result = (literal_left.literal.literal.as_boolean()) && (literal_right.literal.literal.as_boolean());
+				this->compiler.info(std::string("Emitting literal when simplifying ") +
+					BOOL_TO_STR(literal_left.literal.literal.as_boolean()) + " and " +
+					BOOL_TO_STR(literal_right.literal.literal.as_boolean()) + " on line " +
+					std::to_string(expr.op.line) + ": " +
+					BOOL_TO_STR(result)
+				);
 				return emit_boolean_literal(expr.op, result);
 			}
 			else if(expr.op.type == TokenType::OR)
 			{
-				bool result = (*literal_left.literal.literal.boolean) || (*literal_right.literal.literal.boolean);
-				printf("emitting literal when simplifying OR between booleans on line %i: %s\n", expr.op.line, result ? "true" : "false");
+				bool result = (literal_left.literal.literal.as_boolean()) || (literal_right.literal.literal.as_boolean());
+				this->compiler.info(std::string("Emitting literal when simplifying ") +
+					BOOL_TO_STR(literal_left.literal.literal.as_boolean()) + " or " +
+					BOOL_TO_STR(literal_right.literal.literal.as_boolean()) + " on line " +
+					std::to_string(expr.op.line) + ": " +
+					BOOL_TO_STR(result)
+				);
 				return emit_boolean_literal(expr.op, result);
 			}
 		}
@@ -254,18 +312,29 @@ void* Optimizer::visitStmtIf(Stmt::If& stmt)
 	Expr::Literal* condition_literal = static_cast<Expr::Literal*>(stmt.condition->accept(*this));
 	if (condition_literal)
 	{
-		if (condition_literal->literal.literal.boolean)
+		Literal& literal = condition_literal->literal.literal;
+		if (literal.is_boolean())
 		{
-			if (*condition_literal->literal.literal.boolean)
+			if (literal.as_boolean())
 			{
-				printf("Branching on constant simplified to true branch.\n");
+				this->compiler.info(std::string("Branching on line ") +
+					std::to_string(condition_literal->literal.line) +
+					" simplified to true brach."
+				);
 				return stmt.branch_true.release();
 			}
 			if (stmt.branch_false)
 			{
-				printf("Branching on constant simplified to false branch.\n");
+				this->compiler.info(std::string("Branching on line ") +
+					std::to_string(condition_literal->literal.line) +
+					" simplified to false branch."
+				);
 				return stmt.branch_false.release();
 			}
+			this->compiler.info(std::string("Branching on line ") +
+				std::to_string(condition_literal->literal.line) +
+				" simplified to removal of condition."
+			);
 			return new Stmt::Block({}, stmt.token);
 		}
 	}
