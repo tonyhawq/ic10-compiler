@@ -100,6 +100,15 @@ bool Literal::is_boolean() const
 	return this->boolean;
 }
 
+bool Literal::is_integral() const
+{
+	if (!this->is_number())
+	{
+		return false;
+	}
+	return static_cast<double>(static_cast<int>(this->as_number())) == this->as_number();
+}
+
 double Literal::as_number() const
 {
 	if (!this->is_number())
@@ -107,6 +116,15 @@ double Literal::as_number() const
 		throw std::runtime_error("Attempted to get number literal while literal is not of type number.");
 	}
 	return *this->number;
+}
+
+int Literal::as_integer() const
+{
+	if (!this->is_integral())
+	{
+		throw std::runtime_error("Attempted to convert number literal to integer while literal is not integral (possibly not a number)");
+	}
+	return static_cast<int>(*this->number);
 }
 
 const std::string& Literal::as_string() const

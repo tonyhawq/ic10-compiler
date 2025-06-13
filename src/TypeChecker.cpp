@@ -795,10 +795,6 @@ void* TypeChecker::visitExprDeviceLoad(Expr::DeviceLoad& expr)
 	std::unique_ptr<TypeName> device = this->accept(*expr.device);
 	if (device)
 	{
-		if (!device->compile_time)
-		{
-			this->error(expr.logic_type, "Cannot perform a dload operation on a non-compile time device.");
-		}
 		if (!device->const_unqualified_equals(this->t_number))
 		{
 			this->error(expr.logic_type, std::string("Cannot perform a dload operation on a non-number device (device type was ") + device->type_name());
@@ -851,10 +847,6 @@ void* TypeChecker::visitStmtDeviceSet(Stmt::DeviceSet& expr)
 	std::unique_ptr<TypeName> device = this->accept(*expr.device);
 	if (device)
 	{
-		if (!device->compile_time)
-		{
-			this->error(expr.token, "A dset operation requires a compile-time known device.");
-		}
 		if (!device->const_unqualified_equals(this->t_number))
 		{
 			this->error(expr.token, "A dset operation requires a numerical device id.");

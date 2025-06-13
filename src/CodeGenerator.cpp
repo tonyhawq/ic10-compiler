@@ -97,7 +97,7 @@ void StackEnvironment::forget(const std::string& name)
 	throw std::runtime_error(std::string("Attempted to forget a non-existent variable: ") + name);
 }
 
-void StackEnvironment::define(const std::string& name, int size)
+StackVariable& StackEnvironment::define(const std::string& name, int size)
 {
 	for (auto& var : this->variables)
 	{
@@ -108,13 +108,14 @@ void StackEnvironment::define(const std::string& name, int size)
 	var->id = this->variable_list.size();
 	this->variable_list.push_back(var);
 	this->m_frame_size += size;
+	return *var;
 }
 
-void StackEnvironment::define_static(const std::string& name, int size)
+StackVariable& StackEnvironment::define_static(const std::string& name, int size)
 {
-	this->define(name, size);
-	StackVariable& var = this->variables.at(name);
+	StackVariable& var = this->define(name, size);
 	var.is_static = true;
+	return var;
 }
 
 void StackEnvironment::set_frame_size(int value)
@@ -204,6 +205,14 @@ Register::Register(RegisterHandle handle)
 Register::~Register()
 {}
 
+Register::Register(const Register& other)
+	:register_handle(other.register_handle)
+{}
+
+Register::Register(Register&& other) noexcept
+	:register_handle(std::move(other.register_handle))
+{}
+
 std::string Register::to_string() const
 {
 	return std::string("r") + std::to_string(this->index());
@@ -222,6 +231,93 @@ RegisterHandle* Register::release()
 int Register::index() const
 {
 	return *this->register_handle;
+}
+
+RegisterOrLiteral::RegisterOrLiteral(const Register& reg)
+	:m_reg(std::make_unique<Register>(reg)), m_literal(nullptr)
+{}
+
+RegisterOrLiteral::RegisterOrLiteral(const Literal& literal)
+	:m_literal(std::make_unique<Literal>(literal)), m_reg(nullptr)
+{}
+
+RegisterOrLiteral::RegisterOrLiteral(RegisterOrLiteral&& other) noexcept
+	:m_literal(std::move(other.m_literal)), m_reg(std::move(other.m_reg))
+{}
+
+bool RegisterOrLiteral::is_register() const
+{
+	return this->m_reg.get();
+}
+
+bool RegisterOrLiteral::is_literal() const
+{
+	return this->m_literal.get();
+}
+
+Register& RegisterOrLiteral::get_register()
+{
+	if (!this->is_register())
+	{
+		throw std::runtime_error("Attempted to get register while this was not a register.");
+	}
+	return *this->m_reg;
+}
+
+Literal& RegisterOrLiteral::get_literal()
+{
+	if (!this->is_literal())
+	{
+		throw std::runtime_error("Attempted to get literal while this was not a literal.");
+	}
+	return *this->m_literal;
+}
+
+const Register& RegisterOrLiteral::get_register() const
+{
+	if (!this->is_register())
+	{
+		throw std::runtime_error("Attempted to get register while this was not a register.");
+	}
+	return *this->m_reg;
+}
+
+const Literal& RegisterOrLiteral::get_literal() const
+{
+	if (!this->is_literal())
+	{
+		throw std::runtime_error("Attempted to get literal while this was not a literal.");
+	}
+	return *this->m_literal;
+}
+
+std::string RegisterOrLiteral::to_string() const
+{
+	if (this->is_literal())
+	{
+		Literal literal = *this->m_literal;
+		if (literal.is_string())
+		{
+			return literal.as_string();
+		}
+		if (literal.is_hashstring())
+		{
+			throw std::runtime_error("NOT IMPLEMENTED");
+		}
+		if (literal.is_number())
+		{
+			return std::to_string(literal.as_number());
+		}
+		if (literal.is_boolean())
+		{
+			return literal.as_boolean() ? "1" : "0";
+		}
+	}
+	if (this->is_register())
+	{
+		return this->m_reg->to_string();
+	}
+	throw std::runtime_error("Attempted to call ::to_string on an invalid RegisterOrLiteral.");
 }
 
 RegisterAllocator::RegisterAllocator(size_t register_count)
@@ -378,7 +474,7 @@ void CodeGenerator::emit_peek_stack_from_into(Register* reg)
 	this->emit_register_use(*reg);
 	this->emit_raw("\n");
 	
-	this->emit_raw("add sp sp 1");
+	this->emit_raw("add sp sp 1\n");
 	
 	this->emit_raw("peek ");
 	this->emit_register_use(*reg);
@@ -389,31 +485,32 @@ void CodeGenerator::emit_peek_stack_from_into(Register* reg)
 	this->emit_raw("\n");
 }
 
-std::unique_ptr<RegisterHandle> CodeGenerator::visit_expr_raw(std::shared_ptr<Expr> expr)
+std::unique_ptr<RegisterOrLiteral> CodeGenerator::visit_expr_raw(std::shared_ptr<Expr> expr)
 {
-	return std::unique_ptr<RegisterHandle>(static_cast<RegisterHandle*>(expr->accept(*this)));
+	return std::unique_ptr<RegisterOrLiteral>(static_cast<RegisterOrLiteral*>(expr->accept(*this)));
 }
 
-Register CodeGenerator::visit_expr(std::shared_ptr<Expr> expr)
+std::unique_ptr<RegisterOrLiteral> CodeGenerator::visit_expr(std::shared_ptr<Expr> expr)
 {
-	std::unique_ptr<RegisterHandle> handle = this->visit_expr_raw(expr);
+	std::unique_ptr<RegisterOrLiteral> handle = this->visit_expr_raw(expr);
 	if (!handle)
 	{
-		throw std::runtime_error("No temporary register returned from expr");
+		throw std::runtime_error("No register or literal returned from expr");
 	}
-	return Register(*handle);
+	return handle;
 }
 
 void* CodeGenerator::visitExprBinary(Expr::Binary& expr)
 {
-	std::unique_ptr<RegisterHandle> left_temporary_handle = this->visit_expr_raw(expr.left);
-	std::unique_ptr<RegisterHandle> right_temporary_handle = this->visit_expr_raw(expr.right);
+	std::unique_ptr<RegisterOrLiteral> left_temporary_handle = this->visit_expr_raw(expr.left);
+	std::unique_ptr<RegisterOrLiteral> right_temporary_handle = this->visit_expr_raw(expr.right);
 	if (!left_temporary_handle || !right_temporary_handle)
 	{
 		throw std::runtime_error("Binary operation requires two values.");
 	}
-	Register left_temporary(*left_temporary_handle);
-	Register right_temporary(*right_temporary_handle);
+	RegisterOrLiteral& left_temporary = *left_temporary_handle;
+	RegisterOrLiteral& right_temporary = *right_temporary_handle;
+	Register output = this->get_or_make_output_register(left_temporary, right_temporary);
 	switch (expr.op.type)
 	{
 	case TokenType::PLUS:
@@ -444,11 +541,13 @@ void* CodeGenerator::visitExprBinary(Expr::Binary& expr)
 		throw std::runtime_error("Binary operation had non +-*/ type.");
 	}
 	// store result in left temporary
-	this->emit_register_use(left_temporary);
+	this->emit_register_use(output);
 	this->emit_raw(" ");
-	this->emit_register_use(left_temporary, right_temporary);
+	this->emit_raw(left_temporary.to_string());
+	this->emit_raw(" ");
+	this->emit_raw(right_temporary.to_string());
 	this->emit_raw("\n");
-	return left_temporary.release();
+	return new RegisterOrLiteral(output);
 }
 
 void* CodeGenerator::visitExprGrouping(Expr::Grouping& expr)
@@ -458,37 +557,35 @@ void* CodeGenerator::visitExprGrouping(Expr::Grouping& expr)
 
 void* CodeGenerator::visitExprLiteral(Expr::Literal& expr)
 {
-	Register reg = allocator.allocate();
-	this->emit_raw("move ");
-	this->emit_register_use(reg);
-	this->emit_raw(" ");
-	if (expr.literal.literal.string)
-	{
-		throw std::runtime_error("Attempted to generate instruction for using a string literal.");
-	}
-	else if (expr.literal.literal.boolean)
-	{
-		if (*expr.literal.literal.boolean) this->emit_raw("1");
-		else this->emit_raw("0");
-	}
-	else if (expr.literal.literal.number)
-	{
-		this->emit_raw(std::to_string(*expr.literal.literal.number));
-	}
-	this->emit_raw("\n");
-	return reg.release();
+	return new RegisterOrLiteral(expr.literal.literal);
 }
 
 void* CodeGenerator::visitExprUnary(Expr::Unary& expr)
 {
-	Register reg = this->visit_expr(expr.right);
+	std::unique_ptr<RegisterOrLiteral> handle = this->visit_expr(expr.right);
+	RegisterOrLiteral& reg = *handle;
 	switch (expr.op.type)
 	{
 	case TokenType::BANG:
+		if (reg.is_literal())
+		{
+			return new RegisterOrLiteral(Literal(!reg.get_literal().as_boolean()));
+		}
 		this->emit_raw("seqz ");
-		this->emit_register_use(reg, reg);
+		this->emit_register_use(reg.get_register(), reg.get_register());
 		this->emit_raw("\n");
-		break;
+		return handle.release();
+	case TokenType::MINUS:
+		if (reg.is_literal())
+		{
+			return new RegisterOrLiteral(Literal(-reg.get_literal().as_number()));
+		}
+		this->emit_raw("sub ");
+		this->emit_raw(reg.to_string());
+		this->emit_raw(" 0 ");
+		this->emit_raw(reg.to_string());
+		this->emit_raw("\n");
+		return handle.release();
 	case TokenType::AMPERSAND:
 		if (!expr.right->is<Expr::Variable>())
 		{
@@ -498,12 +595,12 @@ void* CodeGenerator::visitExprUnary(Expr::Unary& expr)
 		// TODO
 		break;
 	case TokenType::BAR:
-		this->emit_peek_stack_from_into(&reg);
+		// TODO
 		break;
 	default:
 		throw std::runtime_error("Attempt to generate unary operation failed, invalid operation.");
 	}
-	return reg.release();
+	throw std::runtime_error("Return missed while generating unary operation.");
 }
 
 std::string CodeGenerator::get_register_name(const Register& reg)
@@ -519,13 +616,21 @@ void CodeGenerator::emit_load_into(int offset, const std::string& register_label
 		Register sp = this->allocator.allocate();
 		this->emit_raw("move ");
 		this->emit_register_use(sp);
-		this->emit_raw(" sp \n");
+		this->emit_raw(" sp\n");
 
 		// offsets are off-by-one
 		// -1 is actually 0
+		/*
+		static fixed number device = -1; # offset 3 -> -4 # push 0 peek 1
+		static number x = 42;            # offset 2 -> -3 # push 1 peek 2
+		static number y = 69;            # offset 1 -> -2 # push 2 peek 3
+		static number z = -42;           # offset 0 -> -1 # push 3 peek 4
+		*/
+
+		printf("For loading offset %i moving sp to %i\n", offset, this->top_env.frame_size() + offset + 1);
 
 		this->emit_raw("move sp ");
-		this->emit_raw(std::to_string(-offset));
+		this->emit_raw(std::to_string(this->top_env.frame_size() + offset + 1));
 		this->emit_raw("\n");
 
 		this->emit_raw("peek ");
@@ -562,7 +667,7 @@ void CodeGenerator::emit_load_into(int offset, Register* reg)
 	this->emit_load_into(offset, this->get_register_name(*reg));
 }
 
-void CodeGenerator::emit_store_into(int offset, const Register& source)
+void CodeGenerator::emit_store_into(int offset, const RegisterOrLiteral& source)
 {
 	if (offset < 0)
 	{
@@ -576,11 +681,11 @@ void CodeGenerator::emit_store_into(int offset, const Register& source)
 		// -1 is actually 0
 
 		this->emit_raw("move sp ");
-		this->emit_raw(std::to_string((-offset) - 1));
+		this->emit_raw(std::to_string(this->top_env.frame_size() + offset));
 		this->emit_raw("\n");
 
 		this->emit_raw("push ");
-		this->emit_register_use(source);
+		this->emit_raw(source.to_string());
 		this->emit_raw("\n");
 
 		this->emit_raw("move sp ");
@@ -595,7 +700,7 @@ void CodeGenerator::emit_store_into(int offset, const Register& source)
 		this->emit_raw("sub sp sp 1\n");
 
 		this->emit_raw("push ");
-		this->emit_register_use(source);
+		this->emit_raw(source.to_string());
 		this->emit_raw("\n");
 		return;
 	}
@@ -604,7 +709,7 @@ void CodeGenerator::emit_store_into(int offset, const Register& source)
 	this->emit_raw("\n");
 
 	this->emit_raw("push ");
-	this->emit_register_use(source);
+	this->emit_raw(source.to_string());
 	this->emit_raw("\n");
 
 	this->emit_raw("add sp sp ");
@@ -620,13 +725,15 @@ void* CodeGenerator::visitExprVariable(Expr::Variable& expr)
 	{
 		throw std::runtime_error("Attempt to use undefined variable.");
 	}
+	printf("loading var %s\n", expr.name.lexeme.c_str());
 	this->emit_load_into(var->offset, &reg);
-	return reg.release();
+	return new RegisterOrLiteral(reg);
 }
 
 void* CodeGenerator::visitExprAssignment(Expr::Assignment& expr)
 {
-	Register value = this->visit_expr(expr.value);
+	std::unique_ptr<RegisterOrLiteral> handle = this->visit_expr(expr.value);
+	RegisterOrLiteral& value = *handle;
 	std::unique_ptr<StackVariable> var = this->env->resolve(expr.name.lexeme);
 	if (!var)
 	{
@@ -641,12 +748,12 @@ void* CodeGenerator::visitStmtReturn(Stmt::Return& expr)
 	this->comment("return statement for ");
 	this->comment(this->env->function_name().substr(sizeof("@function")));
 
-	std::unique_ptr<Register> return_value;
+	std::unique_ptr<RegisterOrLiteral> return_value;
 
 	// push return value
 	if (expr.value)
 	{
-		return_value = std::make_unique<Register>(this->visit_expr(expr.value));
+		return_value = this->visit_expr(expr.value);
 	}
 
 	int return_address_offset = this->env->resolve("@return")->offset;
@@ -670,7 +777,7 @@ void* CodeGenerator::visitStmtReturn(Stmt::Return& expr)
 	if (return_value)
 	{
 		this->emit_raw("push ");
-		this->emit_register_use(*return_value);
+		this->emit_raw(return_value->to_string());
 		this->emit_raw("\n");
 	}
 	else
@@ -790,9 +897,9 @@ void* CodeGenerator::visitExprCall(Expr::Call& expr)
 
 	for (auto& arg : expr.arguments)
 	{
-		Register loaded = this->visit_expr(arg);
+		std::unique_ptr<RegisterOrLiteral> loaded = this->visit_expr(arg);
 		this->emit_raw("push ");
-		this->emit_register_use(loaded);
+		this->emit_raw(loaded->to_string());
 		this->emit_raw("\n");
 	}
 
@@ -821,28 +928,35 @@ void* CodeGenerator::visitExprCall(Expr::Call& expr)
 
 void* CodeGenerator::visitExprLogical(Expr::Logical& expr)
 {
-	Register left = this->visit_expr(expr.left);
-	Register right = this->visit_expr(expr.right);
+	std::unique_ptr<RegisterOrLiteral> left_handle = this->visit_expr(expr.left);
+	std::unique_ptr<RegisterOrLiteral> right_handle = this->visit_expr(expr.right);
+	RegisterOrLiteral& left = *left_handle;
+	RegisterOrLiteral& right = *right_handle;
+	Register output = this->get_or_make_output_register(left, right);
 	switch (expr.op.type)
 	{
 	case TokenType::AND:
 		this->emit_raw("min ");
-		this->emit_register_use(left);
+		this->emit_register_use(output);
 		this->emit_raw(" ");
-		this->emit_register_use(left, right);
+		this->emit_raw(left.to_string());
+		this->emit_raw(" ");
+		this->emit_raw(right.to_string());
 		this->emit_raw("\n");
 		break;
 	case TokenType::OR:
 		this->emit_raw("max ");
-		this->emit_register_use(left);
+		this->emit_register_use(output);
 		this->emit_raw(" ");
-		this->emit_register_use(left, right);
+		this->emit_raw(left.to_string());
+		this->emit_raw(" ");
+		this->emit_raw(right.to_string());
 		this->emit_raw("\n");
 		break;
 	default:
 		throw std::runtime_error("");
 	}
-	return left.release();
+	return new RegisterOrLiteral(output);
 }
 
 void CodeGenerator::visit_stmt(std::unique_ptr<Stmt>& stmt)
@@ -868,7 +982,7 @@ void CodeGenerator::visit_stmt(std::unique_ptr<Stmt>& stmt)
 
 void* CodeGenerator::visitStmtExpression(Stmt::Expression& expr)
 {
-	std::unique_ptr<RegisterHandle> tmp(this->visit_expr_raw(expr.expression));
+	this->visit_expr_raw(expr.expression);
 
 	return nullptr;
 }
@@ -897,9 +1011,9 @@ void* CodeGenerator::visitStmtPrint(Stmt::Print& expr)
 
 void* CodeGenerator::visitStmtStatic(Stmt::Static& expr)
 {
-	Register value = this->visit_expr(expr.var->initalizer);
+	std::unique_ptr<RegisterOrLiteral> value = this->visit_expr(expr.var->initalizer);
 	this->emit_raw("push ");
-	this->emit_register_use(value);
+	this->emit_raw(value->to_string());
 	this->emit_raw("\n");
 	this->env->define_static(expr.var->name.lexeme, 1);
 	return nullptr;
@@ -907,9 +1021,9 @@ void* CodeGenerator::visitStmtStatic(Stmt::Static& expr)
 
 void* CodeGenerator::visitStmtVariable(Stmt::Variable& expr)
 {
-	Register value = this->visit_expr(expr.initalizer);
+	std::unique_ptr<RegisterOrLiteral> value = this->visit_expr(expr.initalizer);
 	this->emit_raw("push ");
-	this->emit_register_use(value);
+	this->emit_raw(value->to_string());
 	this->emit_raw("\n");
 
 	this->env->define(expr.name.lexeme, 1);
@@ -941,6 +1055,22 @@ void* CodeGenerator::visitStmtBlock(Stmt::Block& expr)
 	return nullptr;
 }
 
+Register CodeGenerator::get_or_make_output_register(const RegisterOrLiteral& a, const RegisterOrLiteral& b)
+{
+	if (a.is_literal() && b.is_literal())
+	{
+		return this->allocator.allocate();
+	}
+	if (a.is_register())
+	{
+		return a.get_register();
+	}
+	if (b.is_register())
+	{
+		return b.get_register();
+	}
+	throw std::runtime_error("Unreachable code.");
+}
 
 Placeholder CodeGenerator::emit_placeholder()
 {
@@ -969,7 +1099,7 @@ int CodeGenerator::current_line()
 
 void* CodeGenerator::visitStmtIf(Stmt::If& expr)
 {
-	Register value = this->visit_expr(expr.condition);
+	std::unique_ptr<RegisterOrLiteral> value = this->visit_expr(expr.condition);
 	
 	/*
 
@@ -988,7 +1118,7 @@ void* CodeGenerator::visitStmtIf(Stmt::If& expr)
 	*/
 
 	this->emit_raw("breqz ");
-	this->emit_register_use(value);
+	this->emit_raw(value->to_string());
 	this->emit_raw(" ");
 	Placeholder placeholder = this->emit_placeholder();
 	this->emit_raw("\n");
@@ -1024,6 +1154,67 @@ void CodeGenerator::comment(const std::string& val)
 	this->emit_raw("\n");
 }
 
+void* CodeGenerator::visitExprDeviceLoad(Expr::DeviceLoad& expr)
+{
+	std::unique_ptr<RegisterOrLiteral> device = this->visit_expr(expr.device);
+	const std::string& logic_type = expr.logic_type.literal.as_string();
+	Register output = this->allocator.allocate();
+	this->emit_raw("l ");
+	this->emit_register_use(output);
+	this->emit_raw(" ");
+	if (device->is_literal())
+	{
+		this->emit_raw("d");
+		this->emit_raw(std::to_string(device->get_literal().as_integer()));
+	}
+	else
+	{
+		this->emit_raw("r");
+		this->emit_raw(device->get_register().to_string());
+	}
+	this->emit_raw(" ");
+	this->emit_raw(logic_type);
+	this->emit_raw("\n");
+	return new RegisterOrLiteral(output);
+}
+
+void* CodeGenerator::visitStmtDeviceSet(Stmt::DeviceSet& expr)
+{
+	std::unique_ptr<RegisterOrLiteral> device = this->visit_expr(expr.device);
+	const std::string& logic_type = expr.logic_type.literal.as_string();
+	std::unique_ptr<RegisterOrLiteral> value = this->visit_expr(expr.value);
+	this->emit_raw("s ");
+	if (device->is_literal())
+	{
+		this->emit_raw("d");
+		int device_id = device->get_literal().as_integer();
+		if (device_id == -1)
+		{
+			this->emit_raw("b");
+		}
+		else if (device_id > 5 || device_id < -1)
+		{
+			this->error(expr.token, std::string("Attempted to set device d") + std::to_string(device_id) + " which is out of range for dx {-1 <= x <= 5}.");
+			throw CodeGenerationError();
+		}
+		else
+		{
+			this->emit_raw(std::to_string(device->get_literal().as_integer()));
+		}
+	}
+	else
+	{
+		this->emit_raw("r");
+		this->emit_raw(device->get_register().to_string());
+	}
+	this->emit_raw(" ");
+	this->emit_raw(logic_type);
+	this->emit_raw(" ");
+	this->emit_raw(value->to_string());
+	this->emit_raw("\n");
+	return nullptr;
+}
+
 void* CodeGenerator::visitStmtWhile(Stmt::While& expr)
 {
 	if (expr.condition->is<Expr::Literal>())
@@ -1041,10 +1232,10 @@ void* CodeGenerator::visitStmtWhile(Stmt::While& expr)
 		return nullptr;
 	}
 	int line = this->current_line();
-	Register condition = this->visit_expr(expr.condition);
+	std::unique_ptr<RegisterOrLiteral> condition = this->visit_expr(expr.condition);
 	
 	this->emit_raw("brlez ");
-	this->emit_register_use(condition);
+	this->emit_raw(condition->to_string());
 	this->emit_raw(" ");
 	Placeholder placeholder = this->emit_placeholder();
 	this->emit_raw("\n");

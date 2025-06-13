@@ -75,7 +75,9 @@ struct Literal
 	bool is_string() const;
 	bool is_hashstring() const;
 	bool is_boolean() const;
+	bool is_integral() const;
 
+	int as_integer() const;
 	double as_number() const;
 	const std::string& as_string() const;
 	const std::string& as_hash_string() const;

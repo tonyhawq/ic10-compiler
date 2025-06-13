@@ -1,9 +1,15 @@
-static fixed number device = 0 + 4;
+static fixed number device = -1; # offset 3 -> -4 # push 0 peek 1
+static number x = 42;            # offset 2 -> -3 # push 1 peek 2
+static number y = 69;            # offset 1 -> -2 # push 2 peek 3
+static number z = -42;           # offset 0 -> -1 # push 3 peek 4 # frame size 4
 
 function main() -> void
 {
-	number val = dload device "Temperature";
-	boolean isOpen = dload device "Open" -> boolean;
-	dset device "Speed" val;
+	x = x + 1;
+	dset device "Setting" x;
+	asm "yield";
+	asm "yield";
+	asm "yield";
+	asm "yield";
 	return;
 }

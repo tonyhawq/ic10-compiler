@@ -68,6 +68,9 @@ struct Expr
 	template <typename T>
 	bool is();
 
+	template <typename T>
+	T& as();
+
 	virtual void* accept(Visitor&) = 0;
 	
 	Expr(TypeName type) :type(type) {};
@@ -97,6 +100,12 @@ bool Expr::is()
 	return typeid(T).hash_code() == typeid(*this).hash_code();
 }
 
+template <typename T>
+T& Expr::as()
+{
+	return dynamic_cast<T&>(*this);
+}
+
 struct Stmt
 {
 	struct Expression;
@@ -115,6 +124,9 @@ struct Stmt
 	template <typename T>
 	bool is();
 
+	template <typename T>
+	T& as();
+
 	virtual void* accept(Stmt::Visitor&) = 0;
 	virtual std::string to_string() { return "Stmt"; }
 };
@@ -123,6 +135,12 @@ template <typename T>
 bool Stmt::is()
 {
 	return typeid(T).hash_code() == typeid(*this).hash_code();
+}
+
+template <typename T>
+T& Stmt::as()
+{
+	return dynamic_cast<T&>(*this);
 }
 
 class Stmt::Visitor

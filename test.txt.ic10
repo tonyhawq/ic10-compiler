@@ -1,8 +1,38 @@
-move r0 4.000000
-push r0
-jal 7
+push -1.000000
+push 42.000000
+push 69.000000
+push -42.000000
+jal 9
 sub sp sp 1
 jr -2
 #Function definition for
 #main_return_void_params_
 push ra
+move r1 sp
+move sp 2
+peek r0
+move sp r1
+add r0 r0 1.000000
+move r1 sp 
+move sp 1
+push r0
+move sp r1
+move r1 sp
+move sp 1
+peek r0
+move sp r1
+move r2 sp
+move sp 2
+peek r1
+move sp r2
+s rr0 Setting r1
+yield
+yield
+yield
+yield
+#return statement for 
+#main_return_void_params_
+peek ra
+sub sp sp 1
+push 0
+j ra

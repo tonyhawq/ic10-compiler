@@ -29,8 +29,8 @@ public:
 	int frame_size() const;
 
 	void forget(const std::string& name);
-	void define(const std::string& name, int size);
-	void define_static(const std::string& name, int size);
+	StackVariable& define(const std::string& name, int size);
+	StackVariable& define_static(const std::string& name, int size);
 	std::unique_ptr<StackVariable> resolve(const std::string& name);
 
 	bool is_in_function() const;
@@ -57,8 +57,8 @@ class Register
 public:
 	explicit Register(RegisterHandle handle);
 	~Register();
-	Register(const Register& other) = default;
-	Register(Register&& other) = default;
+	Register(const Register& other);
+	Register(Register&& other) noexcept;
 	
 	RegisterHandle* release();
 	RegisterHandle handle();
@@ -67,6 +67,28 @@ public:
 	std::string to_string() const;
 private:
 	RegisterHandle register_handle;
+};
+
+class RegisterOrLiteral
+{
+public:
+	RegisterOrLiteral(const Register& reg);
+	RegisterOrLiteral(const Literal& literal);
+	RegisterOrLiteral(const RegisterOrLiteral& other) = delete;
+	RegisterOrLiteral(RegisterOrLiteral&& other) noexcept;
+
+	bool is_register() const;
+	bool is_literal() const;
+
+	Register& get_register();
+	Literal& get_literal();
+	const Register& get_register() const;
+	const Literal& get_literal() const;
+
+	std::string to_string() const;
+private:
+	std::unique_ptr<Register> m_reg;
+	std::unique_ptr<Literal> m_literal;
 };
 
 class RegisterAllocator
@@ -100,30 +122,34 @@ public:
 
 	std::string generate();
 
-	std::unique_ptr<RegisterHandle> visit_expr_raw(std::shared_ptr<Expr> expression);
-	Register visit_expr(std::shared_ptr<Expr> expression);
+	Register get_or_make_output_register(const RegisterOrLiteral& a, const RegisterOrLiteral& b);
+
+	std::unique_ptr<RegisterOrLiteral> visit_expr_raw(std::shared_ptr<Expr> expression);
+	std::unique_ptr<RegisterOrLiteral> visit_expr(std::shared_ptr<Expr> expression);
 
 	void visit_stmt(std::unique_ptr<Stmt>& stmt);
 
-	virtual void* visitExprBinary(Expr::Binary& expr);
-	virtual void* visitExprGrouping(Expr::Grouping& expr);
-	virtual void* visitExprLiteral(Expr::Literal& expr);
-	virtual void* visitExprUnary(Expr::Unary& expr);
-	virtual void* visitExprVariable(Expr::Variable& expr);
-	virtual void* visitExprAssignment(Expr::Assignment& expr);
-	virtual void* visitExprCall(Expr::Call& expr);
-	virtual void* visitExprLogical(Expr::Logical& expr);
+	virtual void* visitExprBinary(Expr::Binary& expr) override;
+	virtual void* visitExprGrouping(Expr::Grouping& expr) override;
+	virtual void* visitExprLiteral(Expr::Literal& expr) override;
+	virtual void* visitExprUnary(Expr::Unary& expr) override;
+	virtual void* visitExprVariable(Expr::Variable& expr) override;
+	virtual void* visitExprAssignment(Expr::Assignment& expr) override;
+	virtual void* visitExprCall(Expr::Call& expr) override;
+	virtual void* visitExprLogical(Expr::Logical& expr) override;
+	virtual void* visitExprDeviceLoad(Expr::DeviceLoad& expr) override;
 
-	virtual void* visitStmtExpression(Stmt::Expression& expr);
-	virtual void* visitStmtAsm(Stmt::Asm& expr);
-	virtual void* visitStmtPrint(Stmt::Print& expr);
-	virtual void* visitStmtVariable(Stmt::Variable& expr);
-	virtual void* visitStmtBlock(Stmt::Block& expr);
-	virtual void* visitStmtIf(Stmt::If& expr);
-	virtual void* visitStmtFunction(Stmt::Function& expr);
-	virtual void* visitStmtReturn(Stmt::Return& expr);
-	virtual void* visitStmtWhile(Stmt::While& expr);
+	virtual void* visitStmtExpression(Stmt::Expression& expr) override;
+	virtual void* visitStmtAsm(Stmt::Asm& expr) override;
+	virtual void* visitStmtPrint(Stmt::Print& expr) override;
+	virtual void* visitStmtVariable(Stmt::Variable& expr) override;
+	virtual void* visitStmtBlock(Stmt::Block& expr) override;
+	virtual void* visitStmtIf(Stmt::If& expr) override;
+	virtual void* visitStmtFunction(Stmt::Function& expr) override;
+	virtual void* visitStmtReturn(Stmt::Return& expr) override;
+	virtual void* visitStmtWhile(Stmt::While& expr) override;
 	virtual void* visitStmtStatic(Stmt::Static& expr) override;
+	virtual void* visitStmtDeviceSet(Stmt::DeviceSet& expr) override;
 private:
 	void store_register_values();
 	void restore_register_values();
@@ -137,7 +163,7 @@ private:
 	void emit_register_use(const Register& reg);
 	void emit_register_use(const Register& a, const Register& b);
 	void emit_peek_stack_from_into(Register* reg);
-	void emit_store_into(int offset, const Register& source);
+	void emit_store_into(int offset, const RegisterOrLiteral& source);
 	void emit_load_into(int offset, const std::string& register_label);
 	void emit_load_into(int offset, Register* reg);
 
