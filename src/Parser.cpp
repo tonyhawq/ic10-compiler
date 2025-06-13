@@ -120,11 +120,11 @@ std::unique_ptr<Stmt> Parser::parse_function_declaration()
 
 bool Parser::peek_var_decl()
 {
-	return this->peek().type == TokenType::IDENTIFIER && (
+	return (this->peek().type == TokenType::IDENTIFIER && (
 		this->peek_ahead(1).type == TokenType::IDENTIFIER ||
 		this->peek_ahead(1).type == TokenType::CONST ||
 		this->peek_ahead(1).type == TokenType::STAR
-		);
+		)) || (this->peek().type == TokenType::CONST || this->peek().type == TokenType::FIXED);
 }
 
 std::unique_ptr<Stmt> Parser::parse_symbols()

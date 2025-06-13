@@ -16,11 +16,7 @@ move r1 sp
 move sp 0
 push r0
 move sp r1
-move r1 sp
-move sp 1
-peek r0
-move sp r1
-s db Setting r0
+s db Setting 42
 l r0 db Setting
 push r0
 peek r0

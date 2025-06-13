@@ -5,8 +5,9 @@ static number z = -42;           # offset 0 -> -1 # push 3 peek 4
 
 function main() -> void
 {
+	fixed number fn = 42;
 	x = x + 1;
-	dset device "Setting" x;
+	dset device "Setting" fn;
 
 	number afterset = dload device "Setting" -> number;
 	
