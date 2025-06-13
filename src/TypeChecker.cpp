@@ -863,7 +863,7 @@ void* TypeChecker::visitStmtDeviceSet(Stmt::DeviceSet& expr)
 		{
 			this->error(expr.token, "Cannot set device value to a non-intrinsic type (number, boolean).");
 		}
-		if (*value_type != this->t_number && *value_type != this->t_boolean)
+		if (!value_type->const_unqualified_equals(this->t_number) && !value_type->const_unqualified_equals(this->t_boolean))
 		{
 			this->error(expr.token, std::string("Cannot set device value to a value of type ") + value_type->type_name());
 		}

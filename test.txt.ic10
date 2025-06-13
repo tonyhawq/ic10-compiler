@@ -26,13 +26,33 @@ move sp 2
 peek r1
 move sp r2
 s rr0 Setting r1
+move r1 sp
+move sp 1
+peek r0
+move sp r1
+l r1 rr0 Setting
+push r1
+peek r0
+move r2 sp
+move sp 2
+peek r1
+move sp r2
+sne r0 r0 r1
+breqz r0 6
+move r2 sp
+move sp 1
+peek r1
+move sp r2
+s rr1 Setting 62.000000
 yield
 yield
 yield
 yield
 #return statement for 
 #main_return_void_params_
-peek ra
 sub sp sp 1
+peek ra
+add sp sp 1
+sub sp sp 2
 push 0
 j ra

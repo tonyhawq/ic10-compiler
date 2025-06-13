@@ -537,8 +537,14 @@ void* CodeGenerator::visitExprBinary(Expr::Binary& expr)
 	case TokenType::LESS_EQUAL:
 		this->emit_raw("sle ");
 		break;
+	case TokenType::EQUAL_EQUAL:
+		this->emit_raw("seq ");
+		break;
+	case TokenType::BANG_EQUAL:
+		this->emit_raw("sne ");
+		break;
 	default:
-		throw std::runtime_error("Binary operation had non +-*/ type.");
+		throw std::runtime_error("Binary operation had invalid type.");
 	}
 	// store result in left temporary
 	this->emit_register_use(output);
