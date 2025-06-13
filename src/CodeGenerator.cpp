@@ -793,14 +793,15 @@ void* CodeGenerator::visitStmtReturn(Stmt::Return& expr)
 void* CodeGenerator::visitStmtFunction(Stmt::Function& expr)
 {
 	// function definitons are only on top level
-	std::string name = this->m_program.env().root()->get_variable(expr.name.lexeme)->full_type().mangled_name();
+	const Variable& function = *this->m_program.env().root()->get_variable(expr.name.lexeme);
+	std::string mangled_name = function.full_type().mangled_name();
 
 	this->comment("Function definition for");
-	this->comment(name.substr(sizeof("@function")));
+	this->comment(mangled_name.substr(sizeof("@function")));
 
-	this->emit_raw(name);
+	this->emit_raw(mangled_name);
 	this->emit_raw(":");
-	this->push_env(name);
+	this->push_env(mangled_name);
 
 	// get all arguments
 	for (const auto& param : expr.params)
@@ -817,6 +818,16 @@ void* CodeGenerator::visitStmtFunction(Stmt::Function& expr)
 	for (auto& stmt : expr.body)
 	{
 		this->visit_stmt(stmt);
+	}
+
+	if (expr.body.size() == 0)
+	{
+		this->error(expr.name, std::string("Expected body for function ") + function.identifier().name());
+	}
+	else if (!expr.body.at(expr.body.size() - 1)->is<Stmt::Return>())
+	{
+		this->error(expr.name, std::string("Expected return statement as final statement in function ") + function.identifier().name() + " got " +
+			expr.body.at(expr.body.size() - 1)->to_string() + " statement instead.");
 	}
 
 	this->env = this->env->pop_to_function();

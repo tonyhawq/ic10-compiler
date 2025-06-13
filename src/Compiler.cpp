@@ -44,6 +44,12 @@ void Compiler::compile(const std::string& path)
 	CodeGenerator generator(*this, env);
 	std::string code = generator.generate();
 	this->info(std::string("Code generation took ") + std::to_string(timer.start() * 1000.0) + "ms.");
+	if (this->had_error)
+	{
+		printf("Errors detected.\n");
+		printf("Aborting before writing file.\n");
+		return;
+	}
 	std::ofstream generated_file;
 	std::string output = (path + ".ic10").c_str();
 	generated_file.open(output);
