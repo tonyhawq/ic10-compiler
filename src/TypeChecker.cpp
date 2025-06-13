@@ -104,6 +104,16 @@ const TypeName& Variable::type() const
 	return this->m_type.type;
 }
 
+TypeName& Variable::type()
+{
+	return this->m_type.type;
+}
+
+TypeID& Variable::full_type()
+{
+	return this->m_type;
+}
+
 const TypeID& Variable::full_type() const
 {
 	return this->m_type;
@@ -146,14 +156,36 @@ TypedEnvironment::Leaf* TypedEnvironment::root()
 	return this->m_root.get();
 }
 
-TypedEnvironment::Leaf::Leaf(TypedEnvironment& progenitor) :parent(nullptr), m_progenitor(&progenitor), id(0)
+TypedEnvironment::Leaf::Leaf(TypedEnvironment& progenitor) :parent(nullptr), owning_statement(nullptr), m_progenitor(&progenitor), id(0)
 {
 	this->id = this->m_progenitor->advance(this);
 }
 
-TypedEnvironment::Leaf::Leaf(Leaf* parent) :parent(parent), m_progenitor(parent->m_progenitor)
+TypedEnvironment::Leaf::Leaf(Leaf* parent, Stmt* statement) :parent(parent), owning_statement(statement), m_progenitor(parent->m_progenitor)
 {
 	this->id = this->m_progenitor->advance(this);
+}
+
+TypedEnvironment::Leaf* TypedEnvironment::Leaf::enter(Stmt* statement)
+{
+	for (auto& child : this->m_children)
+	{
+		if (child.owning_statement == statement)
+		{
+			return &child;
+		}
+	}
+	return nullptr;
+}
+
+const Stmt* TypedEnvironment::Leaf::get_owning_statement()
+{
+	return this->owning_statement;
+}
+
+void TypedEnvironment::Leaf::set_owning_statement(Stmt* stmt)
+{
+	this->owning_statement = stmt;
 }
 
 TypedEnvironment::Leaf::~Leaf()
@@ -161,21 +193,21 @@ TypedEnvironment::Leaf::~Leaf()
 
 TypedEnvironment::Leaf::Leaf(Leaf&& other) noexcept
 	:m_function_name(std::move(other.m_function_name)), parent(other.parent), m_children(std::move(other.m_children)), m_variables(std::move(other.m_variables)),
-	m_progenitor(other.m_progenitor), id(other.id)
+	m_progenitor(other.m_progenitor), id(other.id), owning_statement(other.owning_statement)
 {
 	this->m_progenitor->reassign(this->id, this);
 }
 
-TypedEnvironment::Leaf* TypedEnvironment::Leaf::spawn_inside_function(const std::string& name)
+TypedEnvironment::Leaf* TypedEnvironment::Leaf::spawn_inside_function(Stmt* statement, const std::string& name)
 {
-	Leaf* env = this->spawn();
+	Leaf* env = this->spawn(statement);
 	env->m_function_name = std::make_unique<std::string>(name);
 	return env;
 }
 
-TypedEnvironment::Leaf* TypedEnvironment::Leaf::spawn()
+TypedEnvironment::Leaf* TypedEnvironment::Leaf::spawn(Stmt* statement)
 {
-	this->m_children.push_back(Leaf(this));
+	this->m_children.push_back(Leaf(this, statement));
 	return &this->m_children.back();
 }
 
@@ -230,6 +262,12 @@ const Variable* TypedEnvironment::Leaf::get_variable(const Identifier& identifie
 		return this->parent->get_variable(identifier);
 	}
 	return nullptr;
+}
+
+Variable* TypedEnvironment::Leaf::get_mut_variable(const Identifier& identifier)
+{
+	const Variable* var = this->get_variable(identifier);
+	return const_cast<Variable*>(var);
 }
 
 TypedEnvironment& TypedEnvironment::Leaf::progenitor()
@@ -952,9 +990,29 @@ void* TypeChecker::visitStmtBlock(Stmt::Block& stmt)
 	{
 		return nullptr;
 	}
-	this->env = this->env->spawn();
+	this->env = this->env->spawn(&stmt);
 	this->evaluate(stmt.statements);
 	this->env = this->env->get_parent();
+	return nullptr;
+}
+
+void* TypeChecker::visitStmtWhile(Stmt::While& expr)
+{
+	if (this->current_pass == Pass::Linking)
+	{
+		return nullptr;
+	}
+	std::unique_ptr<TypeName> condition_type = this->accept(*expr.condition);
+	if (!condition_type)
+	{
+		expr.body->accept(*this);
+		return nullptr;
+	}
+	if (!condition_type->const_unqualified_equals(this->t_boolean))
+	{
+		this->error(expr.token, "Attempted to loop on a non-boolean condition.");
+	}
+	expr.body->accept(*this);
 	return nullptr;
 }
 
@@ -1082,7 +1140,7 @@ void* TypeChecker::visitStmtFunction(Stmt::Function& expr)
 	// typechecking
 
 	bool had_error = false;
-	this->env = this->env->spawn_inside_function(expr.name.lexeme);
+	this->env = this->env->spawn_inside_function(&expr, expr.name.lexeme);
 	for (const auto& param : expr.params)
 	{
 		const TypeName& param_type = param.type;

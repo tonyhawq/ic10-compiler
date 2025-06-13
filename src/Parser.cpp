@@ -268,7 +268,7 @@ std::unique_ptr<Stmt> Parser::parse_for_statement()
 	{
 		condition = std::make_shared<Expr::Literal>(Token(token.line, TokenType::TRUE, "true", true));
 	}
-	body = std::make_unique<Stmt::While>(condition, std::move(body));
+	body = std::make_unique<Stmt::While>(token, condition, std::move(body));
 	if (initalizer)
 	{
 		std::vector<std::unique_ptr<Stmt>> new_body;
@@ -281,11 +281,12 @@ std::unique_ptr<Stmt> Parser::parse_for_statement()
 
 std::unique_ptr<Stmt> Parser::parse_while_statement()
 {
+	const Token& token = this->peek_previous();
 	this->consume(TokenType::LEFT_PAREN, "Expected ( following while.");
 	std::shared_ptr<Expr> condition = this->parse_expression();
 	this->consume(TokenType::RIGHT_PAREN, "Expected ) following while condition.");
 	std::unique_ptr<Stmt> body = this->parse_statement();
-	return std::make_unique<Stmt::While>(condition, std::move(body));
+	return std::make_unique<Stmt::While>(token, condition, std::move(body));
 }
 
 std::unique_ptr<Stmt> Parser::parse_return_statement()

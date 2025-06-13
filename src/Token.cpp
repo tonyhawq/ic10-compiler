@@ -63,6 +63,78 @@ Literal::Literal(Literal&& other) noexcept
 	other.boolean = nullptr;
 }
 
+Literal& Literal::operator=(const Literal& other)
+{
+	if (this == &other)
+	{
+		return *this;
+	}
+	if (this->number)
+	{
+		delete this->number;
+	}
+	if (this->string)
+	{
+		delete this->string;
+	}
+	if (this->boolean)
+	{
+		delete this->boolean;
+	}
+	if (other.number)
+	{
+		this->number = new double(*other.number);
+	}
+	if (other.string)
+	{
+		this->string = new std::string(*other.string);
+	}
+	if (other.boolean)
+	{
+		this->boolean = new bool(*other.boolean);
+	}
+	this->string_hashed = other.string_hashed;
+	return *this;
+}
+
+Literal& Literal::operator=(Literal&& other) noexcept
+{
+	if (this == &other)
+	{
+		return *this;
+	}
+	if (this->number)
+	{
+		delete this->number;
+	}
+	if (this->string)
+	{
+		delete this->string;
+	}
+	if (this->boolean)
+	{
+		delete this->boolean;
+	}
+	if (other.number)
+	{
+		this->number = other.number;
+		other.number = nullptr;
+	}
+	if (other.string)
+	{
+		this->string = other.string;
+		other.string = nullptr;
+	}
+	if (other.boolean)
+	{
+		this->boolean = other.boolean;
+		other.boolean = nullptr;
+	}
+	this->string_hashed = other.string_hashed;
+	other.string_hashed = false;
+	return *this;
+}
+
 std::string Literal::display()
 {
 	if (this->string)
@@ -78,6 +150,27 @@ std::string Literal::display()
 		return std::to_string(*this->boolean);
 	}
 	return std::string("NULL");
+}
+
+std::string Literal::to_value_string() const
+{
+	if (this->is_number())
+	{
+		if (this->is_integral())
+		{
+			return std::to_string(this->as_integer());
+		}
+		return std::to_string(this->as_number());
+	}
+	if (this->is_boolean())
+	{
+		return this->as_boolean() ? "1" : "0";
+	}
+	if (this->is_string())
+	{
+		return this->as_string();
+	}
+	throw std::runtime_error("NOT IMPLEMENTED");
 }
 
 bool Literal::is_number() const
@@ -154,6 +247,52 @@ bool Literal::as_boolean() const
 	return *this->boolean;
 }
 
+std::string Literal::to_lexeme() const
+{
+	if (this->is_number())
+	{
+		if (this->is_integral())
+		{
+			return std::to_string(this->as_integer());
+		}
+		return std::to_string(this->as_number());
+	}
+	if (this->is_boolean())
+	{
+		return this->as_boolean() ? "true" : "false";
+	}
+	if (this->is_string())
+	{
+		return this->as_string();
+	}
+	if (this->is_hashstring())
+	{
+		return this->as_hash_string();
+	}
+	throw std::runtime_error("Attempted to call ::to_lexeme on an invalid literal.");
+}
+
+TokenType Literal::type() const
+{
+	if (this->is_number())
+	{
+		return TokenType::NUMBER;
+	}
+	if (this->is_string())
+	{
+		return TokenType::STRING;
+	}
+	if (this->is_hashstring())
+	{
+		return TokenType::HASHED_STRING;
+	}
+	if (this->is_boolean())
+	{
+		return this->as_boolean() ? TokenType::TRUE : TokenType::FALSE;
+	}
+	throw std::runtime_error("Attempted to call ::type on an invalid literal.");
+}
+
 Token::Token(int line, TokenType type, const std::string& lexeme)
 	:line(line), type(type), lexeme(lexeme), literal()
 {}
@@ -178,6 +317,10 @@ Token::Token(int line, TokenType type, const std::string& lexeme, const char* li
 	}
 	this->literal.string = new std::string(literal);
 }
+
+Token::Token(int line, TokenType type, const std::string& lexeme, const Literal& literal)
+	:line(line), type(type), lexeme(lexeme), literal(literal)
+{}
 
 Token::Token(const Token& other)
 	:line(other.line), literal(other.literal), type(other.type), lexeme(other.lexeme)

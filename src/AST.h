@@ -119,6 +119,7 @@ struct Stmt
 	struct While;
 	struct Static;
 	struct DeviceSet;
+	struct NoOp;
 	class Visitor;
 
 	template <typename T>
@@ -157,7 +158,14 @@ public:
 	virtual void* visitStmtWhile(Stmt::While& expr) { return nullptr; }
 	virtual void* visitStmtStatic(Stmt::Static& expr) { return nullptr; }
 	virtual void* visitStmtDeviceSet(Stmt::DeviceSet& expr) { return nullptr; }
+	virtual void* visitStmtNoOp(Stmt::NoOp& expr) { return nullptr; }
 private:
+};
+
+struct Stmt::NoOp : public Stmt
+{
+	NoOp() {};
+	NODE_VISIT_IMPL(Stmt, NoOp)
 };
 
 struct Stmt::DeviceSet : public Stmt
@@ -188,7 +196,8 @@ struct Stmt::Return : public Stmt
 
 struct Stmt::While : public Stmt
 {
-	While(std::shared_ptr<Expr> condition, std::unique_ptr<Stmt> body) :condition(condition), body(std::move(body)) {};
+	While(const Token& token, std::shared_ptr<Expr> condition, std::unique_ptr<Stmt> body) :token(token), condition(condition), body(std::move(body)) {};
+	Token token;
 	std::shared_ptr<Expr> condition;
 	std::unique_ptr<Stmt> body;
 	NODE_VISIT_IMPL(Stmt, While)

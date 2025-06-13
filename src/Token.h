@@ -69,6 +69,10 @@ struct Literal
 	~Literal();
 	Literal(const Literal& other);
 	Literal(Literal&& other) noexcept;
+
+	Literal& operator=(const Literal& other);
+	Literal& operator=(Literal&& other) noexcept;
+
 	std::string display();
 
 	bool is_number() const;
@@ -83,6 +87,10 @@ struct Literal
 	const std::string& as_hash_string() const;
 	bool as_boolean() const;
 
+	std::string to_value_string() const;
+	std::string to_lexeme() const;
+	TokenType type() const;
+
 	double* number;
 	bool string_hashed;
 	std::string* string;
@@ -93,6 +101,7 @@ class Token
 {
 public:
 	Token(int line, TokenType type, const std::string& lexeme);
+	Token(int line, TokenType type, const std::string& lexeme, const Literal& literal);
 	Token(int line, TokenType type, const std::string& lexeme, bool literal);
 	Token(int line, TokenType type, const std::string& lexeme, double literal);
 	Token(int line, TokenType type, const std::string& lexeme, const char* literal);

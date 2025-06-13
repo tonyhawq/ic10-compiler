@@ -296,22 +296,7 @@ std::string RegisterOrLiteral::to_string() const
 	if (this->is_literal())
 	{
 		Literal literal = *this->m_literal;
-		if (literal.is_string())
-		{
-			return literal.as_string();
-		}
-		if (literal.is_hashstring())
-		{
-			throw std::runtime_error("NOT IMPLEMENTED");
-		}
-		if (literal.is_number())
-		{
-			return std::to_string(literal.as_number());
-		}
-		if (literal.is_boolean())
-		{
-			return literal.as_boolean() ? "1" : "0";
-		}
+		return literal.to_value_string();
 	}
 	if (this->is_register())
 	{
@@ -1157,7 +1142,20 @@ void* CodeGenerator::visitExprDeviceLoad(Expr::DeviceLoad& expr)
 	if (device->is_literal())
 	{
 		this->emit_raw("d");
-		this->emit_raw(std::to_string(device->get_literal().as_integer()));
+		int device_id = device->get_literal().as_integer();
+		if (device_id == -1)
+		{
+			this->emit_raw("b");
+		}
+		else if (device_id > 5 || device_id < -1)
+		{
+			this->error(expr.logic_type, std::string("Attempted to set device d") + std::to_string(device_id) + " which is out of range for dx {-1 <= x <= 5}.");
+			throw CodeGenerationError();
+		}
+		else
+		{
+			this->emit_raw(std::to_string(device->get_literal().as_integer()));
+		}
 	}
 	else
 	{

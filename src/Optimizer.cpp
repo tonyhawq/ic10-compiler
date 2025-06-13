@@ -4,8 +4,8 @@
 #define BOOL_TO_STR(val) ((val) ? "true" : "false")
 #define FOLD_INTO(thing_to_fold_into, accepted) do { void* value = accepted; if (value) { thing_to_fold_into = std::shared_ptr<Expr::Literal>(static_cast<Expr::Literal*>(value)); } }  while (0)
 
-Optimizer::Optimizer(Compiler& compiler, TypeCheckedProgram & env)
-	:compiler(compiler), m_env(env)
+Optimizer::Optimizer(Compiler& compiler, TypeCheckedProgram& env)
+	:compiler(compiler), m_env(env), local_env(env.env().root())
 {}
 
 void Optimizer::optimize()
@@ -17,13 +17,17 @@ void Optimizer::evaluate(std::vector<std::unique_ptr<Stmt>>& statements)
 {
 	for (int i = 0; i < statements.size(); i++)
 	{
-		std::unique_ptr<Stmt>& statement = statements[i];
-		std::unique_ptr<Stmt> stmt = std::unique_ptr<Stmt>(static_cast<Stmt*>(statement->accept(*this)));
+		std::unique_ptr<Stmt> stmt = this->visit_stmt(statements[i]);
 		if (stmt)
 		{
 			statements[i] = std::move(stmt);
 		}
 	}
+}
+
+std::unique_ptr<Stmt> Optimizer::visit_stmt(std::unique_ptr<Stmt>& stmt)
+{
+	return std::unique_ptr<Stmt>(static_cast<Stmt*>(stmt->accept(*this)));
 }
 
 static bool is_arithmentic(TokenType token)
@@ -208,11 +212,44 @@ void* Optimizer::visitExprLiteral(Expr::Literal& expr)
 
 void* Optimizer::visitExprUnary(Expr::Unary& expr)
 {
+	FOLD_INTO(expr.right, expr.right->accept(*this));
+	if (expr.right->is<Expr::Literal>())
+	{
+		Expr::Literal& right = expr.right->as<Expr::Literal>();
+		Literal result;
+		switch (expr.op.type)
+		{
+		case TokenType::BANG:
+			result = !right.literal.literal.as_boolean();
+			return new Expr::Literal(Token(expr.op.line, result.type(), result.to_lexeme(), result.as_boolean()));
+		case TokenType::MINUS:
+			result = -right.literal.literal.as_number();
+			return new Expr::Literal(Token(expr.op.line, result.type(), result.to_lexeme(), result.as_number()));
+		default:
+			throw std::runtime_error("Invalid operation for unary expression.");
+		}
+	}
 	return nullptr;
 }
 
 void* Optimizer::visitExprVariable(Expr::Variable& expr)
 {
+	const Variable* var = this->local_env->get_variable(Identifier(expr.name.lexeme));
+	if (!var)
+	{
+		throw std::runtime_error(std::string("Could not get variable ") + expr.name.lexeme);
+	}
+	if (var->type().compile_time)
+	{
+		const Literal& literal = var->full_type().fixed_value;
+		return new Expr::Literal(Token(expr.name.line, literal.type(), literal.to_lexeme(), literal));
+	}
+	return nullptr;
+}
+
+void* Optimizer::visitExprDeviceLoad(Expr::DeviceLoad& expr)
+{
+	FOLD_INTO(expr.device, expr.device->accept(*this));
 	return nullptr;
 }
 
@@ -290,20 +327,54 @@ void* Optimizer::visitStmtPrint(Stmt::Print& stmt)
 	return nullptr;
 }
 
+void* Optimizer::visitStmtDeviceSet(Stmt::DeviceSet& expr)
+{
+	FOLD_INTO(expr.device, expr.device->accept(*this));
+	FOLD_INTO(expr.value, expr.value->accept(*this));
+	return nullptr;
+}
+
 void* Optimizer::visitStmtStatic(Stmt::Static& stmt)
 {
-	return stmt.var->accept(*this);
+	std::unique_ptr<Stmt> converted(stmt.var.get());
+	Stmt* folded = this->visit_stmt(converted).release();
+	converted.release();
+	return folded;
 }
 
 void* Optimizer::visitStmtVariable(Stmt::Variable& stmt)
 {
 	FOLD_INTO(stmt.initalizer, stmt.initalizer->accept(*this));
+	Variable* var = this->local_env->get_mut_variable(stmt.name.lexeme);
+	if (!var)
+	{
+		throw std::runtime_error(std::string("Could not get variable ") + stmt.name.lexeme);
+	}
+	if (var->type().compile_time)
+	{
+		if (!stmt.initalizer->is<Expr::Literal>())
+		{
+			throw std::runtime_error(std::string("Optimizer could not fold compile time constant value ") + stmt.name.lexeme);
+		}
+		var->full_type().fixed_value = stmt.initalizer->as<Expr::Literal>().literal.literal;
+		this->compiler.info(std::string("Folded fixed value ") + var->identifier().name() + " into " + var->full_type().fixed_value.to_lexeme());
+		return new Stmt::NoOp();
+	}
 	return nullptr;
 }
 
 void* Optimizer::visitStmtBlock(Stmt::Block& stmt)
 {
+	this->local_env = this->local_env->enter(&stmt);
 	this->evaluate(stmt.statements);
+	this->local_env = this->local_env->get_parent();
+	return nullptr;
+}
+
+void* Optimizer::visitStmtWhile(Stmt::While& expr)
+{
+	FOLD_INTO(expr.condition, expr.condition->accept(*this));
+	this->visit_stmt(expr.body);
 	return nullptr;
 }
 
@@ -348,8 +419,14 @@ void* Optimizer::visitStmtIf(Stmt::If& stmt)
 
 void* Optimizer::visitStmtFunction(Stmt::Function& expr)
 {
+	this->local_env = this->local_env->enter(&expr);
+	if (!this->local_env)
+	{
+		throw std::runtime_error("Attempted to enter a statement which does not confer an environment.");
+	}
 	// todo: fold/inline functions
 	this->evaluate(expr.body);
+	this->local_env = this->local_env->get_parent();
 	return nullptr;
 }
 

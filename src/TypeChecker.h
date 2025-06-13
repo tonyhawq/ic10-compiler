@@ -27,6 +27,7 @@ struct TypeID
 	const std::string& mangled_name() const;
 	const std::string& unmangled_name() const;
 	const std::vector<FunctionParam>& arguments() const;
+	Literal fixed_value;
 
 	bool is_function = false;
 	std::unique_ptr<TypeName> m_return_type;
@@ -67,6 +68,9 @@ class Variable
 public:
 	Variable(const Identifier& identifier, const TypeID& type);
 
+	TypeName& type();
+	TypeID& full_type();
+
 	const TypeName& type() const;
 	const TypeID& full_type() const;
 	const Identifier& identifier() const;
@@ -98,15 +102,15 @@ class TypedEnvironment::Leaf
 {
 public:
 	explicit Leaf(TypedEnvironment& progenitor);
-	Leaf(Leaf* parent);
+	Leaf(Leaf* parent, Stmt* statement);
 	~Leaf();
 	Leaf(const Leaf& other) = delete;
 	Leaf(Leaf&& other) noexcept;
 
 	TypedEnvironment& progenitor();
 
-	Leaf* spawn_inside_function(const std::string& name);
-	Leaf* spawn();
+	Leaf* spawn_inside_function(Stmt* statement, const std::string& name);
+	Leaf* spawn(Stmt* statement);
 	Leaf* get_parent();
 	size_t leaf_id() const;
 
@@ -120,11 +124,17 @@ public:
 		Undefined
 	};
 	LongerLived longer_lived(const Variable& a, const Variable& b);
+	
+	Leaf* enter(Stmt* statement);
+	const Stmt* get_owning_statement();
+	void set_owning_statement(Stmt* stmt);
 
 	const std::list<Leaf>& children() const;
 	int scopes_to_definition(const Identifier& identifier) const;
 	const Variable* get_variable(const Identifier& identifier) const;
+	Variable* get_mut_variable(const Identifier& identifier);
 private:
+	Stmt* owning_statement;
 	TypedEnvironment* m_progenitor;
 	size_t id;
 	std::unique_ptr<std::string> m_function_name;
@@ -198,6 +208,7 @@ public:
 	virtual void* visitStmtVariable(Stmt::Variable& stmt) override;
 	virtual void* visitStmtBlock(Stmt::Block& stmt) override;
 	virtual void* visitStmtIf(Stmt::If& stmt) override;
+	virtual void* visitStmtWhile(Stmt::While& expr) override;
 	virtual void* visitStmtFunction(Stmt::Function& expr) override;
 	virtual void* visitStmtReturn(Stmt::Return& expr) override;
 	virtual void* visitStmtStatic(Stmt::Static& expr) override;
