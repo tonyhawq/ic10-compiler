@@ -13,72 +13,68 @@ TypeName TypeChecker::t_void = TypeName("void");
 TypeName& TypeID::return_type()
 {
 	CHECK_IS_FUNCTION_OR_ERROR("RETURN TYPE");
-	return *this->m_return_type;
+	return this->function_type->return_type;
 }
 
 std::string& TypeID::unmangled_name()
 {
 	CHECK_IS_FUNCTION_OR_ERROR("UNMANGLED_NAME");
-	return *this->m_unmangled_name;
+	return this->function_type->unmangled_name;
 }
 
 std::string& TypeID::mangled_name()
 {
 	CHECK_IS_FUNCTION_OR_ERROR("MANGLED_NAME");
-	return *this->m_mangled_name;
+	return this->function_type->mangled_name;
 }
 
-std::vector<TypeID::FunctionParam>& TypeID::arguments()
+std::vector<FunctionParam>& TypeID::arguments()
 {
 	CHECK_IS_FUNCTION_OR_ERROR("ARGUMENTS");
-	return *this->m_arguments;
+	return this->function_type->arguments;
 }
 
 const TypeName& TypeID::return_type() const
 {
 	CHECK_IS_FUNCTION_OR_ERROR("RETURN TYPE");
-	return *this->m_return_type;
+	return this->function_type->return_type;
 }
 
 const std::string& TypeID::unmangled_name() const
 {
 	CHECK_IS_FUNCTION_OR_ERROR("UNMANGLED_NAME");
-	return *this->m_unmangled_name;
+	return this->function_type->unmangled_name;
 }
 
 const std::string& TypeID::mangled_name() const
 {
 	CHECK_IS_FUNCTION_OR_ERROR("MANGLED_NAME");
-	return *this->m_mangled_name;
+	return this->function_type->mangled_name;
 }
 
-const std::vector<TypeID::FunctionParam>& TypeID::arguments() const
+const std::vector<FunctionParam>& TypeID::arguments() const
 {
 	CHECK_IS_FUNCTION_OR_ERROR("ARGUMENTS");
-	return *this->m_arguments;
+	return this->function_type->arguments;
 }
 
 TypeID::TypeID(const TypeName& type)
-	:type(type), is_function(false), m_return_type(nullptr), m_unmangled_name(nullptr), m_mangled_name(nullptr)
+	:type(type), is_function(false), function_type(nullptr)
 {}
 
-TypeID::TypeID(const TypeName& type, bool is_function, std::unique_ptr<TypeName> return_type, std::unique_ptr<std::string> m_unmangled_name, std::unique_ptr<std::vector<FunctionParam>> m_arguments)
-	:type(type), is_function(is_function), m_return_type(std::move(return_type)),
-	m_unmangled_name(std::move(m_unmangled_name)), m_arguments(std::move(m_arguments))
+TypeID::TypeID(const TypeName& type, const TypeName& return_type, const std::string& m_unmangled_name, const std::vector<FunctionParam>& m_arguments)
+	:type(type), is_function(true), function_type(std::make_unique<FunctionTypeID>(return_type, "", m_unmangled_name, m_arguments))
 {
-	if (this->is_function)
-	{
-		m_mangled_name = std::make_unique<std::string>(TypeChecker::get_mangled_function_name(this->unmangled_name(), this->arguments(), this->return_type()));
-	}
+	this->function_type->mangled_name = TypeChecker::get_mangled_function_name(this->unmangled_name(), this->arguments(), this->return_type());
 }
 
+FunctionTypeID::FunctionTypeID(const TypeName& return_type, const std::string& mangled_name, const std::string& unmangled_name, const std::vector<FunctionParam> arguments)
+	:return_type(return_type), mangled_name(mangled_name), unmangled_name(unmangled_name), arguments(arguments)
+{}
 
 TypeID::TypeID(const TypeID& other)
 	:type(other.type), is_function(other.is_function),
-	m_return_type(other.m_return_type ? std::make_unique<TypeName>(*other.m_return_type) : nullptr),
-	m_unmangled_name(other.m_unmangled_name ? std::make_unique<std::string>(*other.m_unmangled_name) : nullptr),
-	m_arguments(other.m_arguments ? std::make_unique<std::vector<FunctionParam>>(*other.m_arguments) : nullptr),
-	m_mangled_name(other.m_mangled_name ? std::make_unique<std::string>(*other.m_mangled_name) : nullptr)
+	function_type(other.function_type ? std::make_unique<FunctionTypeID>(*other.function_type) : nullptr)
 {}
 
 Identifier::Identifier(const std::string& name)
@@ -478,10 +474,10 @@ TypeChecker::TypeChecker(Compiler& compiler, std::vector<std::unique_ptr<Stmt>> 
 	:compiler(compiler), env(nullptr), current_pass(Pass::Linking), program(std::move(statements))
 {
 	env = this->program.env().root();
-	this->types.emplace(t_number, TypeID{ t_number, false, nullptr, nullptr, nullptr });
-	this->types.emplace(t_string, TypeID{ t_string, false, nullptr, nullptr, nullptr });
-	this->types.emplace(t_boolean, TypeID{ t_boolean, false, nullptr, nullptr, nullptr });
-	this->types.emplace(t_void, TypeID{ t_void, false, nullptr, nullptr, nullptr });
+	this->types.emplace(t_number, TypeID{ t_number });
+	this->types.emplace(t_string, TypeID{ t_string });
+	this->types.emplace(t_boolean, TypeID{ t_boolean });
+	this->types.emplace(t_void, TypeID{ t_void });
 	
 	this->define_operator(TokenType::GREATER, "op_greater", {
 		new OperatorOverload{t_boolean, {t_number, t_number}}
@@ -545,7 +541,7 @@ void TypeChecker::define_operator(TokenType type, const std::string& name, std::
 
 void TypeChecker::define_library_function(const std::string& name, const TypeName& return_type, const std::vector<TypeName>& arg_types)
 {
-	std::vector<TypeID::FunctionParam> params;
+	std::vector<FunctionParam> params;
 	params.reserve(arg_types.size());
 	for (const auto& arg_type : arg_types)
 	{
@@ -554,10 +550,9 @@ void TypeChecker::define_library_function(const std::string& name, const TypeNam
 	TypeName type = TypeChecker::get_function_signature(params, return_type);
 	TypeID type_id(
 		type,
-		true,
-		std::move(std::make_unique<TypeName>(return_type)),
-		std::move(std::make_unique<std::string>(name)),
-		std::move(std::make_unique<std::vector<TypeID::FunctionParam>>(std::move(params)))
+		return_type,
+		name,
+		params
 		);
 	this->env->define_variable(type_id, name);
 	this->types.emplace(type, type_id);
@@ -1111,7 +1106,7 @@ void* TypeChecker::visitStmtFunction(Stmt::Function& expr)
 				this->error(expr.name, "Entry point (main) must return void.");
 			}
 		}
-		std::vector<TypeID::FunctionParam> args;
+		std::vector<FunctionParam> args;
 		for (const auto& param : expr.params)
 		{
 			const TypeName& param_type = param.type;
@@ -1122,10 +1117,9 @@ void* TypeChecker::visitStmtFunction(Stmt::Function& expr)
 		TypeName function_type = this->get_function_signature(args, expr.return_type);
 		TypeID function_type_id(
 			function_type,
-			true,
-			std::make_unique<TypeName>(expr.return_type),
-			std::make_unique<std::string>(expr.name.lexeme),
-			std::make_unique<std::vector<TypeID::FunctionParam>>(args)
+			expr.return_type,
+			expr.name.lexeme,
+			args
 		);
 
 		bool success = this->env->define_variable(function_type_id, expr.name.lexeme);
@@ -1165,12 +1159,12 @@ void* TypeChecker::visitStmtFunction(Stmt::Function& expr)
 	return nullptr;
 }
 
-std::string TypeChecker::get_mangled_function_name(const std::string& name, const std::vector<TypeID::FunctionParam> params, const TypeName& return_type)
+std::string TypeChecker::get_mangled_function_name(const std::string& name, const std::vector<FunctionParam> params, const TypeName& return_type)
 {
 	std::string type_name = std::string("@function_") + name + "_return_" + return_type.type_name() + "_params_";
 	for (int i = 0; i < params.size(); i++)
 	{
-		const TypeID::FunctionParam& param = params[i];
+		const FunctionParam& param = params[i];
 		type_name += '@';
 		type_name += param.type.type_name();
 		type_name += '_';
@@ -1181,7 +1175,7 @@ std::string TypeChecker::get_mangled_function_name(const std::string& name, cons
 
 TypeName TypeChecker::get_function_signature(const std::vector<Stmt::Function::Param>& params, const TypeName& return_type)
 {
-	std::vector<TypeID::FunctionParam> new_params;
+	std::vector<FunctionParam> new_params;
 	new_params.reserve(params.size());
 	for (const auto& param : params)
 	{
@@ -1193,7 +1187,7 @@ TypeName TypeChecker::get_function_signature(const std::vector<Stmt::Function::P
 	return TypeChecker::get_function_signature(new_params, return_type);
 }
 
-TypeName TypeChecker::get_function_signature(const std::vector<TypeID::FunctionParam>& params, const TypeName& return_type)
+TypeName TypeChecker::get_function_signature(const std::vector<FunctionParam>& params, const TypeName& return_type)
 {
 	std::string signature = "@function__";
 	if (params.size())
