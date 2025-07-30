@@ -577,38 +577,19 @@ void TypeChecker::symbol_visit_expr_variable(Expr::Variable& expr, const Variabl
 {
 	SymbolTable::Index i = this->program.table.lookup_index(info->def().id());
 	SymbolUseNode use = SymbolUseNode(expr.downcast(), UseLocation::During);
-	Symbol& sym = this->program.table.lookup(i);
 	this->program.table.alias_symbol(i, use);
-	if (this->block_parent && this->block_parent->is<Stmt::While>())
-	{
-		// TODO:
-		/*
-		number x = 0;
-		number y = 0;
-		while (y < 5)
-		{
-			y = y + 1;
-			x = 0;
-			while (x < 5)
-			{
-				x = x + y;
-			} <- detected last use of y
-		} when y's last use should be here
-		may cause register churn, but should be ?fine?
-		*/
-		sym.set_end(SymbolUseNode(this->block_parent, UseLocation::AfterStatement));
-	}
-	else
-	{
-		sym.set_end(use);
-	}
+}
+
+void TypeChecker::symbol_visit_expr_assignment(Expr::Assignment& expr, const Variable* info)
+{
+	SymbolTable::Index i = this->program.table.lookup_index(info->def().id());
+	SymbolUseNode use = SymbolUseNode(expr.downcast(), UseLocation::During);
+	this->program.table.alias_symbol(i, use);
 }
 
 void TypeChecker::symbol_visit_stmt_variable(Stmt::Variable& stmt, const Variable* info)
 {
 	SymbolTable::Index i = this->program.table.create_symbol(info->def(), info);
-	Symbol& sym = this->program.table.lookup(i);
-	sym.set_end(SymbolUseNode(stmt.downcast(), UseLocation::AfterStatement));
 }
 
 void* TypeChecker::visitExprVariable(Expr::Variable& expr)
@@ -696,6 +677,7 @@ void* TypeChecker::visitExprAssignment(Expr::Assignment& expr)
 		this->error(expr.name, std::string("Attempted to assign variable \"") + expr.name.lexeme + "\" before it was defined.");
 		return nullptr;
 	}
+	this->symbol_visit_expr_assignment(expr, info);
 	std::unique_ptr<TypeName> var_type;
 	if (this->types.count(info->type().underlying()))
 	{
@@ -1125,8 +1107,6 @@ void* TypeChecker::visitStmtFunction(Stmt::Function& expr)
 			this->env->define_variable(TypeID(param_type), param_name.lexeme, SymbolUseNode(expr.downcast(), UseLocation::During));
 			const Variable* var = this->env->get_variable(param_name.lexeme);
 			SymbolTable::Index i = this->program.table.create_symbol(var->def(), var);
-			Symbol& sym = this->program.table.lookup(i);
-			sym.set_end(var->def());
 		}
 	}
 	if (!this->types.count(expr.return_type.underlying()))

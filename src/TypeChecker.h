@@ -190,6 +190,7 @@ public:
 
 	void symbol_visit_expr_variable(Expr::Variable& expr, const Variable* info);
 	void symbol_visit_stmt_variable(Stmt::Variable& stmt, const Variable* info);
+	void symbol_visit_expr_assignment(Expr::Assignment& expr, const Variable* info);
 
 	static TypeName t_number;
 	static TypeName t_boolean;

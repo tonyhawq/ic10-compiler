@@ -129,6 +129,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\CIR\CIRProgram.cpp" />
+    <ClCompile Include="src\CIR\ASTFlattener.cpp" />
+    <ClCompile Include="src\CIR\CIRRegister.cpp" />
+    <ClCompile Include="src\CIR\CIRInstruction.cpp" />
     <ClCompile Include="src\native\NativeFunction.cpp" />
     <ClCompile Include="src\CodeGenerator.cpp" />
     <ClCompile Include="src\Optimizer.cpp" />
@@ -146,6 +150,10 @@
     <ClCompile Include="src\Typing.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\CIR\CIRProgram.h" />
+    <ClInclude Include="src\CIR\ASTFlattener.h" />
+    <ClInclude Include="src\CIR\CIRRegister.h" />
+    <ClInclude Include="src\CIR\CIRInstruction.h" />
     <ClInclude Include="src\native\NativeFunction.h" />
     <ClInclude Include="src\CodeGenerator.h" />
     <ClInclude Include="src\Optimizer.h" />
@@ -156,6 +164,7 @@
     <ClInclude Include="src\Errors.h" />
     <ClInclude Include="src\Compiler.h" />
     <ClInclude Include="src\Scanner.h" />
+    <ClInclude Include="src\strutil.h" />
     <ClInclude Include="src\Timer.h" />
     <ClInclude Include="src\Token.h" />
     <ClInclude Include="src\TypeChecker.h" />

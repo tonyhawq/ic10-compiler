@@ -2,6 +2,7 @@
 #include "Interpreter.h"
 #include "TypeChecker.h"
 #include "CodeGenerator.h"
+#include "CIR/ASTFlattener.h"
 #include "Timer.h"
 
 const std::unordered_map<std::string, NativeFunction::reference_type>& Compiler::native_functions()
@@ -52,22 +53,14 @@ void Compiler::compile(const std::string& path)
 	Optimizer optimizer(*this, env);
 	optimizer.optimize();
 	this->info(std::string("Optimizing took ") + std::to_string(timer.start() * 1000.0) + "ms.");
-	this->info("Generating code...");
-	CodeGenerator generator(*this, env);
-	std::string code = generator.generate();
-	this->info(std::string("Code generation took ") + std::to_string(timer.start() * 1000.0) + "ms.");
-	if (this->had_error)
+	this->info("Generating CIR...");
+	ASTFlattener flattener(*this, std::move(env));
+	CIRProgram ir = flattener.flatten_program();
+	this->info(std::string("Flattening ") + std::to_string(timer.start() * 1000.0) + "ms.");
+	for (const auto& instruction : ir.instructions)
 	{
-		printf("Errors detected.\n");
-		printf("Aborting before writing file.\n");
-		return;
+		printf("%s\n", instruction->to_string());
 	}
-	std::ofstream generated_file;
-	std::string output = (path + ".ic10").c_str();
-	generated_file.open(output);
-	generated_file << code;
-	generated_file.close();
-	printf("Wrote to %s\n", output.c_str());
 	printf("Compiling took %fms.\n", total_timer.time() * 1000.0);
 }
 
