@@ -199,12 +199,16 @@ struct Stmt::Function : public Stmt
 		Token name;
 	};
 	Function(const Token& name, TypeName return_type, const std::vector<Param>& params, std::vector<std::unique_ptr<Stmt>>&& body)
-		:name(name), return_type(std::move(return_type)), params(params), body(std::move(body)) { };
+		:name(name), return_type(std::move(return_type)), params(params), body(std::move(body)), source(FunctionSource::User) { };
+	Function(const Token& name, TypeName return_type, const std::vector<Param>& params, std::vector<std::unique_ptr<Stmt>>&& body, FunctionSource source)
+		:name(name), return_type(std::move(return_type)), params(params), body(std::move(body)), source(source) {
+	};
 	Token name;
 	TypeName return_type;
 	std::vector<Param> params;
 	std::vector<std::unique_ptr<Stmt>> body;
-	virtual std::unique_ptr<Stmt> clone() const override { return std::make_unique<Stmt::Function>(this->name, this->return_type, this->params, Stmt::clone_vec(this->body)); }
+	FunctionSource source; 
+	virtual std::unique_ptr<Stmt> clone() const override { return std::make_unique<Stmt::Function>(this->name, this->return_type, this->params, Stmt::clone_vec(this->body), this->source); }
 	NODE_VISIT_IMPL(Stmt, Function)
 };
 

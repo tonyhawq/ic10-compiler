@@ -56,13 +56,21 @@ struct FunctionParam
 	std::string name;
 };
 
+enum class FunctionSource
+{
+	User,
+	Builtin,
+};
+
 struct FunctionTypeID
 {
 	FunctionTypeID(const TypeName& return_type, const std::string& mangled_name, const std::string& unmangled_name, const std::vector<FunctionParam> arguments);
+	FunctionTypeID(const TypeName& return_type, const std::string& mangled_name, const std::string& unmangled_name, const std::vector<FunctionParam> arguments, FunctionSource source);
 	TypeName return_type;
 	std::string mangled_name;
 	std::string unmangled_name;
 	std::vector<FunctionParam> arguments;
+	FunctionSource source;
 };
 
 struct TypeID

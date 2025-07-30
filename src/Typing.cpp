@@ -188,8 +188,14 @@ TypeID::TypeID(const TypeName& type, const TypeName& return_type, const std::str
 }
 
 FunctionTypeID::FunctionTypeID(const TypeName& return_type, const std::string& mangled_name, const std::string& unmangled_name, const std::vector<FunctionParam> arguments)
-	:return_type(return_type), mangled_name(mangled_name), unmangled_name(unmangled_name), arguments(arguments)
+	:return_type(return_type), mangled_name(mangled_name), unmangled_name(unmangled_name), arguments(arguments), source(FunctionSource::User)
 {
+}
+
+FunctionTypeID::FunctionTypeID(const TypeName& return_type, const std::string& mangled_name, const std::string& unmangled_name, const std::vector<FunctionParam> arguments, FunctionSource src)
+	:FunctionTypeID(return_type, mangled_name, unmangled_name, arguments)
+{
+	this->source = src;
 }
 
 TypeID::TypeID(const TypeID& other)

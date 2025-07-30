@@ -1057,6 +1057,8 @@ void* TypeChecker::visitStmtFunction(Stmt::Function& expr)
 			args
 		);
 
+		function_type_id.function_type->source = expr.source;
+
 		bool success = this->env->define_variable(function_type_id, expr.name.lexeme, expr.downcast());
 		this->types.emplace(function_type, function_type_id);
 		if (!success)

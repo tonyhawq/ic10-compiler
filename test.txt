@@ -1,8 +1,9 @@
 function main() -> void
 {
-	number afterset = 0;
-	load(afterset);
-	asm "l $&afterset d0 Setting
-s $afterset d0 Setting";
+	number x = 0;
+	{
+		number y = 0;
+		number z = y + x;
+	}
 	return;
 }

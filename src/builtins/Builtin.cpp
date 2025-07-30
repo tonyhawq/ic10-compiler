@@ -1,7 +1,7 @@
 #include "Builtin.h"
 
 Builtin::Builtin(const std::string& name, TypeName return_type, std::vector<Stmt::Function::Param> params)
-	:definition(Token(0, TokenType::IDENTIFIER, name, name.c_str()), return_type, std::move(params), std::move(std::vector<std::unique_ptr<Stmt>>{}))
+	:definition(Token(0, TokenType::IDENTIFIER, name, name.c_str()), return_type, std::move(params), std::move(std::vector<std::unique_ptr<Stmt>>{}), FunctionSource::Builtin)
 {}
 
 Builtin::reference_type Builtin::make_reference(const std::string& name, TypeName return_type, std::vector<Stmt::Function::Param> params)
