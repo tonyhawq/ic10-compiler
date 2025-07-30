@@ -521,7 +521,6 @@ TypeChecker::TypeChecker(Compiler& compiler, std::vector<std::unique_ptr<Stmt>> 
 	this->define_operator(TokenType::BAR, "op_deref", {
 		new OperatorOverload::Deref()
 		});
-	this->define_library_function("yield", t_void, {});
 }
 
 void TypeChecker::define_operator(TokenType type, const std::string& name, std::vector<OwningPtr<OperatorOverload>> overloads)
@@ -1189,17 +1188,16 @@ TypeName TypeChecker::get_function_signature(const std::vector<Stmt::Function::P
 
 TypeName TypeChecker::get_function_signature(const std::vector<FunctionParam>& params, const TypeName& return_type)
 {
-	std::string signature = "@function__";
-	if (params.size())
+	std::string signature = "@fun(";
+	for (size_t i = 0; i < params.size(); i++)
 	{
-		signature += "@params__";
+		signature += params[i].type.type_name();
+		if (i < params.size() - 1)
+		{
+			signature += ",";
+		}
 	}
-	for (const auto& param : params)
-	{
-		signature += param.type.type_name();
-		signature += "_";
-	}
-	signature += "@return";
+	signature += ") -> ";
 	signature += return_type.type_name();
 	return TypeName(std::move(signature));
 }

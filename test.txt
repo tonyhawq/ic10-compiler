@@ -16,6 +16,9 @@ function main() -> void
 		dset device "Setting" 62;
 	}
 	
+	asm "l $&afterset d0 Setting
+s $afterset d0 Setting";
+
 	asm "yield";
 	asm "yield";
 	asm "yield";

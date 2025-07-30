@@ -263,8 +263,9 @@ struct Stmt::Print : public Stmt
 
 struct Stmt::Asm : public Stmt
 {
-	Asm(std::shared_ptr<Expr> literal) :literal(literal) {};
+	Asm(std::shared_ptr<Expr> literal, Token token) :literal(literal), token(token) {};
 	std::shared_ptr<Expr> literal;
+	Token token;
 	NODE_VISIT_IMPL(Stmt, Asm)
 };
 

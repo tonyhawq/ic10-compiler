@@ -16,6 +16,10 @@ std::unique_ptr<StackVariable> StackEnvironment::resolve(const std::string& name
 	if (this->parent)
 	{
 		std::unique_ptr<StackVariable> var = this->parent->resolve(name);
+		if (!var)
+		{
+			return nullptr;
+		}
 		if (var->is_static)
 		{
 			return var;
@@ -345,6 +349,20 @@ Register RegisterAllocator::allocate()
 	throw std::runtime_error("Register allocation failed. No available registers.");
 }
 
+size_t RegisterAllocator::register_count() const
+{
+	return this->registers.size();
+}
+
+bool RegisterAllocator::is_register_in_use(size_t id) const
+{
+	if (id >= this->registers.size())
+	{
+		throw std::out_of_range(std::string("Attempted to get register ") + std::to_string(id) + " which is out of range (0-" + std::to_string(this->register_count() - 1));
+	}
+	return this->registers.at(id).use_count() > 1;
+}
+
 CodeGenerator::CodeGenerator(Compiler& compiler, TypeCheckedProgram& program)
 	:compiler(compiler), m_program(program), allocator(16), top_env(), env(nullptr), current_placeholder_value(0)
 {
@@ -409,7 +427,7 @@ std::string CodeGenerator::generate()
 	{
 		this->compiler.error(-1, e.what());
 	}
-	catch(CodeGenerationError& e)
+	catch(CodeGenerationError&)
 	{
 		this->compiler.error(-1, "Error detected, aborting code generation.");
 		return "";
@@ -421,7 +439,7 @@ std::string CodeGenerator::generate()
 		size_t end = this->code.find(':', found);
 		std::string identifier = this->code.substr(found, end - found);
 		this->code.erase(found, end - found + 1);
-		int line = std::count(this->code.begin(), this->code.begin() + found, '\n');
+		int64_t line = std::count(this->code.begin(), this->code.begin() + found, '\n');
 		find_and_replace_in(this->code, identifier, std::to_string(line));
 	}
 	return std::move(this->code);
@@ -964,6 +982,118 @@ void* CodeGenerator::visitStmtExpression(Stmt::Expression& expr)
 	return nullptr;
 }
 
+static bool acceptable_variable_character(char character)
+{
+	return std::isalnum(character) || character == '&';
+}
+
+namespace string
+{
+	static bool startswith(const std::string& str, char character)
+	{
+		if (!str.size())
+		{
+			return false;
+		}
+		return str.at(0) == character;
+	}
+	static bool startswith(const std::string& str, const std::string& prefix)
+	{
+		if (!str.size())
+		{
+			return false;
+		}
+		if (!prefix.size())
+		{
+			return true;
+		}
+		if (prefix.size() > str.size())
+		{
+			return false;
+		}
+		return strncmp(str.data(), prefix.data(), prefix.size()) == 0;
+	}
+	static void replacefirst(std::string& str, const std::string& val, const std::string& with)
+	{
+		size_t pos = str.find(val);
+		if (pos == std::string::npos)
+		{
+			return;
+		}
+		str.replace(pos, val.length(), with);
+	}
+}
+
+static std::vector<std::string> extract_variables_from_str(const std::string& in)
+{
+	std::vector<std::string> result;
+	for (size_t i = 0; i < in.size(); ++i)
+	{
+		// if current is $ and prev was whitespace
+		if (in[i] == '$' && (i == 0 || !acceptable_variable_character(in[i - 1])))
+		{
+			size_t j = i + 1;
+			while (j < in.size() && acceptable_variable_character(in[j]))
+			{
+				++j;
+			}
+			if (j > i + 1 && (j == in.size() || !acceptable_variable_character(in[j])))
+			{
+				result.push_back(in.substr(i, j - i));
+				i = j - 1;
+			}
+		}
+	}
+	return result;
+}
+
+static std::vector<size_t> extract_registers_from_str(const std::string& in)
+{
+	std::vector<size_t> result;
+	for (size_t i = 0; i < in.size(); ++i) {
+		if (in[i] == 'r' && (i == 0 || !std::isalnum(in[i - 1])))
+		{
+			size_t j = i + 1;
+			while (j < in.size() && std::isdigit(in[j]))
+			{
+				++j;
+			}
+
+			if (j > i + 1 && (j == in.size() || !std::isalnum(in[j])))
+			{
+				// extract number part (skip 'r')
+				size_t regNum = std::strtoull(&in[i + 1], nullptr, 10);
+				result.push_back(regNum);
+				i = j - 1; // skip past number
+			}
+		}
+	}
+	return result;
+}
+
+static std::vector<size_t> extract_unique_registers_from_str(const std::string& in)
+{
+	std::vector<size_t> raw = extract_registers_from_str(in);
+	std::vector<size_t> result;
+	result.reserve(raw.size());
+	for (const auto& val : raw)
+	{
+		if (std::find(result.begin(), result.end(), val) == result.end())
+		{
+			result.push_back(val);
+		}
+	}
+	return result;
+}
+
+struct AsmVariableBinding
+{
+	std::unique_ptr<StackVariable> var;
+	Register allocated;
+	bool load;
+	bool store;
+};
+
 void* CodeGenerator::visitStmtAsm(Stmt::Asm& expr)
 {
 	if (!expr.literal->is<Expr::Literal>())
@@ -975,8 +1105,95 @@ void* CodeGenerator::visitStmtAsm(Stmt::Asm& expr)
 	{
 		throw std::runtime_error("ASM statement was non-string");
 	}
-	this->emit_raw(*str.literal.literal.string);
+	std::string raw = *str.literal.literal.string;
+	std::vector<size_t> registers_used = extract_unique_registers_from_str(raw);
+	std::vector<size_t> registers_pushed;
+	registers_pushed.reserve(registers_used.size());
+	for (const auto& reg : registers_used)
+	{
+		try
+		{
+			if (this->allocator.is_register_in_use(reg))
+			{
+				this->emit_raw("push r");
+				this->emit_raw(std::to_string(reg));
+				this->emit_raw("\n");
+				registers_pushed.push_back(reg);
+			}
+		}
+		catch (const std::out_of_range&)
+		{
+			this->error(expr.token, std::string("asm statment contained register ") + std::to_string(reg) +
+				" which is out of range for possible registers (0-" + std::to_string(this->allocator.register_count() - 1) + ")");
+		}
+	}
+	std::vector<std::string> vars = extract_variables_from_str(raw);
+	std::unordered_map<std::string, AsmVariableBinding> varname_to_operand;
+	for (const auto& rawname : vars)
+	{
+		if (string::startswith(rawname, "$&"))
+		{
+			std::string varname = rawname.substr(2);
+			std::unique_ptr<StackVariable> var = this->env->resolve(varname);
+			if (!var)
+			{
+				this->error(expr.token, std::string("asm statement referenced non-existent variable \"") + varname + "\"");
+			}
+			if (varname_to_operand.count(varname))
+			{
+				AsmVariableBinding& operand = varname_to_operand.at(varname);
+				operand.store = true;
+				string::replacefirst(raw, rawname, operand.allocated.to_string());
+				continue;
+			}
+			Register allocated = this->allocator.allocate();
+			string::replacefirst(raw, rawname, allocated.to_string());
+			varname_to_operand.emplace(varname, AsmVariableBinding{std::move(var), allocated, false, true});
+		}
+		else
+		{
+			std::string varname = rawname.substr(1);
+			std::unique_ptr<StackVariable> var = this->env->resolve(varname);
+			if (!var)
+			{
+				this->error(expr.token, std::string("asm statement referenced non-existent variable \"") + varname + "\"");
+			}
+			if (varname_to_operand.count(varname))
+			{
+				AsmVariableBinding& operand = varname_to_operand.at(varname);
+				operand.load = true;
+				string::replacefirst(raw, rawname, operand.allocated.to_string());
+				continue;
+			}
+			Register allocated = this->allocator.allocate();
+			string::replacefirst(raw, rawname, allocated.to_string());
+			varname_to_operand.emplace(varname, AsmVariableBinding{ std::move(var), allocated, true, false });
+		}
+	}
+	for (auto& operand_pair : varname_to_operand)
+	{
+		auto& operand = operand_pair.second;
+		if (operand.load)
+		{
+			this->emit_load_into(operand.var->offset, &operand.allocated);
+		}
+	}
+	this->emit_raw(raw);
 	this->emit_raw("\n");
+	for (auto it = registers_pushed.rbegin(); it != registers_pushed.rend(); ++it)
+	{
+		this->emit_raw("pop r");
+		this->emit_raw(std::to_string(*it));
+		this->emit_raw("\n");
+	}
+	for (const auto& operand_pair : varname_to_operand)
+	{
+		const auto& operand = operand_pair.second;
+		if (operand.store)
+		{
+			this->emit_store_into(operand.var->offset, operand.allocated);
+		}
+	}
 
 	return nullptr;
 }

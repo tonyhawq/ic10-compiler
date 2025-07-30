@@ -59,7 +59,10 @@ public:
 	~Register();
 	Register(const Register& other);
 	Register(Register&& other) noexcept;
-	
+
+	Register& operator=(Register& other) = default;
+	Register& operator=(Register&& other) = default;
+
 	RegisterHandle* release();
 	RegisterHandle handle();
 	int index() const;
@@ -98,6 +101,8 @@ public:
 	~RegisterAllocator();
 	Register allocate();
 
+	size_t register_count() const;
+	bool is_register_in_use(size_t id) const;
 	std::vector<Register> registers_in_use() const;
 private:
 	std::vector<RegisterHandle> registers;

@@ -27,6 +27,11 @@ move sp r2
 sne r0 r0 r1
 breqz r0 2
 s db Setting 62
+peek r0
+l r0 d0 Setting
+s r0 d0 Setting
+sub sp sp 1
+push r0
 yield
 yield
 yield

@@ -352,6 +352,7 @@ std::unique_ptr<Stmt> Parser::parse_device_set_statement()
 std::unique_ptr<Stmt> Parser::parse_asm_statement()
 {
 	std::shared_ptr<Expr> expression = this->parse_expression();
+	Token token = this->peek_previous();
 	if (!expression->is<Expr::Literal>())
 	{
 		this->error(this->peek(), "Expected string literal following asm.");
@@ -361,7 +362,7 @@ std::unique_ptr<Stmt> Parser::parse_asm_statement()
 		this->error(this->peek(), "Expected string literal following asm.");
 	}
 	this->consume(TokenType::SEMICOLON, "Expected semicolon after asm literal.");
-	return std::make_unique<Stmt::Asm>(expression);
+	return std::make_unique<Stmt::Asm>(expression, token);
 }
 
 std::unique_ptr<Stmt> Parser::parse_expression_statement()
