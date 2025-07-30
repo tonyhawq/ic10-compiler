@@ -51,7 +51,7 @@
     <ClCompile Include="src\Timer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\builtins\Builtin.cpp">
+    <ClCompile Include="src\native\NativeFunction.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\SymbolTable.cpp">
@@ -98,7 +98,7 @@
     <ClInclude Include="src\Timer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\builtins\Builtin.h">
+    <ClInclude Include="src\native\NativeFunction.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\SymbolTable.h">

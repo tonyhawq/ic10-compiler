@@ -129,7 +129,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\builtins\Builtin.cpp" />
+    <ClCompile Include="src\native\NativeFunction.cpp" />
     <ClCompile Include="src\CodeGenerator.cpp" />
     <ClCompile Include="src\Optimizer.cpp" />
     <ClCompile Include="src\Interpreter.cpp" />
@@ -146,7 +146,7 @@
     <ClCompile Include="src\Typing.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\builtins\Builtin.h" />
+    <ClInclude Include="src\native\NativeFunction.h" />
     <ClInclude Include="src\CodeGenerator.h" />
     <ClInclude Include="src\Optimizer.h" />
     <ClInclude Include="src\Interpreter.h" />

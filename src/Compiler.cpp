@@ -4,10 +4,10 @@
 #include "CodeGenerator.h"
 #include "Timer.h"
 
-const std::unordered_map<std::string, Builtin::reference_type>& Compiler::builtins()
+const std::unordered_map<std::string, NativeFunction::reference_type>& Compiler::builtins()
 {
-	static std::unordered_map<std::string, Builtin::reference_type> _builtins = {
-		{"load", (new Builtin("load", TypeName("number"), {{TypeName("number"), Builtin::token_literal_string("dummy")}}))->add_asm("l $&dummy d0 Setting").add_return("dummy").refit()}
+	static std::unordered_map<std::string, NativeFunction::reference_type> _builtins = {
+		{"load", (new NativeFunction("load", TypeName("number"), {{TypeName("number"), NativeFunction::token_literal_string("dummy")}}))->add_asm("l $&dummy d0 Setting").add_return("dummy").refit()}
 	};
 	return _builtins;
 }

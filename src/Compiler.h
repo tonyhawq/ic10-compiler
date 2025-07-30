@@ -18,7 +18,7 @@ public:
 	void error(int line, const std::string& message);
 	void report(int line, const std::string& where, const std::string& message);
 private:
-	static const std::unordered_map<std::string, Builtin::reference_type>& builtins();
+	static const std::unordered_map<std::string, NativeFunction::reference_type>& builtins();
 	enum class ReportingLevel
 	{
 		Errors,
