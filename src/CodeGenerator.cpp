@@ -1205,11 +1205,11 @@ void* CodeGenerator::visitStmtPrint(Stmt::Print& expr)
 
 void* CodeGenerator::visitStmtStatic(Stmt::Static& expr)
 {
-	std::unique_ptr<RegisterOrLiteral> value = this->visit_expr(expr.var->initalizer);
+	std::unique_ptr<RegisterOrLiteral> value = this->visit_expr(expr.var->as<Stmt::Variable>().initalizer);
 	this->emit_raw("push ");
 	this->emit_raw(value->to_string());
 	this->emit_raw("\n");
-	this->env->define_static(expr.var->name.lexeme, 1);
+	this->env->define_static(expr.var->as<Stmt::Variable>().name.lexeme, 1);
 	return nullptr;
 }
 

@@ -72,14 +72,17 @@ Literal& Literal::operator=(const Literal& other)
 	if (this->number)
 	{
 		delete this->number;
+		this->number = nullptr;
 	}
 	if (this->string)
 	{
 		delete this->string;
+		this->string = nullptr;
 	}
 	if (this->boolean)
 	{
 		delete this->boolean;
+		this->boolean = nullptr;
 	}
 	if (other.number)
 	{
@@ -106,14 +109,17 @@ Literal& Literal::operator=(Literal&& other) noexcept
 	if (this->number)
 	{
 		delete this->number;
+		this->number = nullptr;
 	}
 	if (this->string)
 	{
 		delete this->string;
+		this->string = nullptr;
 	}
 	if (this->boolean)
 	{
 		delete this->boolean;
+		this->boolean = nullptr;
 	}
 	if (other.number)
 	{

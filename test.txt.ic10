@@ -44,3 +44,19 @@ add sp sp 1
 sub sp sp 2
 push 0
 j ra
+#Function definition for
+#load_return_number_params_@number_dummy
+push ra
+l r0 d0 Setting
+sub sp sp 2
+push r0
+add sp sp 1
+#return statement for 
+#load_return_number_params_@number_dummy
+sub sp sp 1
+peek r0
+add sp sp 1
+peek ra
+sub sp sp 2
+push r0
+j ra

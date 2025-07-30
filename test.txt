@@ -15,7 +15,7 @@ function main() -> void
 	{
 		dset device "Setting" 62;
 	}
-	
+	load(afterset);
 	asm "l $&afterset d0 Setting
 s $afterset d0 Setting";
 

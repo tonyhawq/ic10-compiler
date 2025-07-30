@@ -7,6 +7,7 @@
 #include "Scanner.h"
 #include "Parser.h"
 #include "Optimizer.h"
+#include "builtins/Builtin.h"
 
 class Compiler : public Expr::Visitor, public Stmt::Visitor
 {
@@ -17,6 +18,7 @@ public:
 	void error(int line, const std::string& message);
 	void report(int line, const std::string& where, const std::string& message);
 private:
+	static const std::unordered_map<std::string, Builtin::reference_type>& builtins();
 	enum class ReportingLevel
 	{
 		Errors,

@@ -4,6 +4,14 @@
 #include "CodeGenerator.h"
 #include "Timer.h"
 
+const std::unordered_map<std::string, Builtin::reference_type>& Compiler::builtins()
+{
+	static std::unordered_map<std::string, Builtin::reference_type> _builtins = {
+		{"load", (new Builtin("load", TypeName("number"), {{TypeName("number"), Builtin::token_literal_string("dummy")}}))->add_asm("l $&dummy d0 Setting").add_return("dummy").refit()}
+	};
+	return _builtins;
+}
+
 void Compiler::compile(const std::string& path)
 {
 	Timer total_timer;
@@ -25,6 +33,10 @@ void Compiler::compile(const std::string& path)
 	this->info("Parsing...");
 	Parser parser(*this, std::move(tokens));
 	std::vector<std::unique_ptr<Stmt>> program = parser.parse();
+	for (const auto& builtin : this->builtins())
+	{
+		program.push_back(builtin.second->splice());
+	}
 	this->info(std::string("Parsing took ") + std::to_string(timer.start() * 1000.0) + "ms.");
 	this->info("Typechecking...");
 	TypeChecker checker(*this, std::move(program));
