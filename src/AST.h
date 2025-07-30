@@ -28,6 +28,8 @@ struct Expr
 	template <typename T>
 	T& as();
 
+	Expr* downcast() { return &this->as<Expr>(); }
+
 	virtual void* accept(Visitor&) = 0;
 
 	virtual std::shared_ptr<Expr> clone() const = 0;
@@ -96,6 +98,8 @@ struct Stmt
 
 	template <typename T>
 	T& as();
+
+	Stmt* downcast() { return &this->as<Stmt>(); }
 
 	virtual void* accept(Stmt::Visitor&) = 0;
 	virtual std::string to_string() { return "Stmt"; }

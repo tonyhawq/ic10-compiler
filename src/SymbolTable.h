@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <optional>
 
-#include "TypeChecker.h"
+#include "Typing.h"
 
 struct Expr;
 struct Stmt;
@@ -22,7 +22,9 @@ class SymbolUseNode
 {
 public:
 	SymbolUseNode(std::shared_ptr<Expr>& expression, UseLocation location);
-	SymbolUseNode(std::unique_ptr<Stmt>& statement, UseLocation location);
+	SymbolUseNode(std::unique_ptr<Stmt>& statement);
+	SymbolUseNode(Expr* expression, UseLocation location);
+	SymbolUseNode(Stmt* statement);
 
 	bool is_expression() const;
 	bool is_statement() const;
@@ -66,12 +68,14 @@ public:
 	
 	Index create_symbol(SymbolUseNode inital);
 	void alias_symbol(Index symbol, SymbolUseNode alias);
+	Index lookup_index(const void* ast_node);
 	Index lookup_index(const std::unique_ptr<Stmt>& ast_node);
 	Index lookup_index(const std::shared_ptr<Expr>& ast_node);
-	Symbol lookup(const std::unique_ptr<Stmt>& ast_node);
-	Symbol lookup(const std::shared_ptr<Expr>& ast_node);
+	Symbol& lookup(const void* ast_node);
+	Symbol& lookup(const std::unique_ptr<Stmt>& ast_node);
+	Symbol& lookup(const std::shared_ptr<Expr>& ast_node);
 private:
 	std::vector<Symbol> symbols;
-	std::unordered_map<void*, Index> name_to_symbol;
+	std::unordered_map<const void*, Index> name_to_symbol;
 };
 

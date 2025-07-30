@@ -35,15 +35,17 @@ namespace std {
 class Variable
 {
 public:
-	Variable(const Identifier& identifier, const TypeID& type);
+	Variable(const Identifier& identifier, const TypeID& type, const SymbolUseNode& node);
 
 	TypeName& type();
 	TypeID& full_type();
 
+	SymbolUseNode def() const;
 	const TypeName& type() const;
 	const TypeID& full_type() const;
 	const Identifier& identifier() const;
 private:
+	SymbolUseNode m_definition;
 	Identifier m_identifier;
 	TypeID m_type;
 };
@@ -84,7 +86,7 @@ public:
 	size_t leaf_id() const;
 
 	const std::string* function() const;
-	bool define_variable(const TypeID& type, const Identifier& identifier);
+	bool define_variable(const TypeID& type, const Identifier& identifier, const SymbolUseNode& def);
 	enum class LongerLived
 	{
 		A,
@@ -184,6 +186,9 @@ public:
 	virtual void* visitStmtReturn(Stmt::Return& expr) override;
 	virtual void* visitStmtStatic(Stmt::Static& expr) override;
 	virtual void* visitStmtDeviceSet(Stmt::DeviceSet& expr) override;
+
+	void symbol_visit_expr_variable(Expr::Variable& expr, const Variable* info);
+	void symbol_visit_stmt_variable(Stmt::Variable& stmt, const Variable* info);
 
 	static TypeName t_number;
 	static TypeName t_boolean;

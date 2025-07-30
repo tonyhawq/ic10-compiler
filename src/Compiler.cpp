@@ -66,8 +66,8 @@ void Compiler::compile(const std::string& path)
 	std::string output = (path + ".ic10").c_str();
 	generated_file.open(output);
 	generated_file << code;
-	printf("Wrote to %s\n", output.c_str());
 	generated_file.close();
+	printf("Wrote to %s\n", output.c_str());
 	printf("Compiling took %fms.\n", total_timer.time() * 1000.0);
 }
 

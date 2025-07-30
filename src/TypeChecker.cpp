@@ -21,9 +21,14 @@ std::string Identifier::name() const
 	return this->m_name;
 }
 
-Variable::Variable(const Identifier& identifier, const TypeID& type)
-	:m_identifier(identifier), m_type(type)
+Variable::Variable(const Identifier& identifier, const TypeID& type, const SymbolUseNode& node)
+	:m_identifier(identifier), m_type(type), m_definition(node)
 {}
+
+SymbolUseNode Variable::def() const
+{
+	return this->m_definition;
+}
 
 const TypeName& Variable::type() const
 {
@@ -155,14 +160,14 @@ const std::string* TypedEnvironment::Leaf::function() const
 	return this->m_function_name.get();
 }
 
-bool TypedEnvironment::Leaf::define_variable(const TypeID& type, const Identifier& identifier)
+bool TypedEnvironment::Leaf::define_variable(const TypeID& type, const Identifier& identifier, const SymbolUseNode& def)
 {
 	const auto& var = this->m_variables.find(identifier);
 	if (var != this->m_variables.end())
 	{
 		return false;
 	}
-	this->m_variables.emplace(identifier, Variable(identifier, type));
+	this->m_variables.emplace(identifier, Variable(identifier, type, def));
 	return true;
 }
 
@@ -468,25 +473,6 @@ void TypeChecker::define_operator(TokenType type, const std::string& name, std::
 	this->operator_types.emplace(type, std::move(Operator(name, std::move(fixed_overloads))));
 }
 
-void TypeChecker::define_library_function(const std::string& name, const TypeName& return_type, const std::vector<TypeName>& arg_types)
-{
-	std::vector<FunctionParam> params;
-	params.reserve(arg_types.size());
-	for (const auto& arg_type : arg_types)
-	{
-		params.push_back({ arg_type, "_" });
-	}
-	TypeName type = types::get_function_signature(params, return_type);
-	TypeID type_id(
-		type,
-		return_type,
-		name,
-		params
-		);
-	this->env->define_variable(type_id, name);
-	this->types.emplace(type, type_id);
-}
-
 TypeCheckedProgram TypeChecker::check()
 {
 	this->current_pass = Pass::Linking;
@@ -581,6 +567,18 @@ void* TypeChecker::visitExprUnary(Expr::Unary& expr)
 	return std::make_unique<TypeName>(return_type).release();
 }
 
+
+void TypeChecker::symbol_visit_expr_variable(Expr::Variable& expr, const Variable* info)
+{
+	SymbolTable::Index i = this->program.table.lookup_index(info->def().id());
+	this->program.table.alias_symbol(i, SymbolUseNode(expr.downcast(), UseLocation::During));
+}
+
+void TypeChecker::symbol_visit_stmt_variable(Stmt::Variable& stmt, const Variable* info)
+{
+	this->program.table.create_symbol(SymbolUseNode(stmt.downcast()));
+}
+
 void* TypeChecker::visitExprVariable(Expr::Variable& expr)
 {
 	const Variable* info = this->env->get_variable(expr.name.lexeme);
@@ -589,6 +587,7 @@ void* TypeChecker::visitExprVariable(Expr::Variable& expr)
 		this->error(expr.name, std::string("Attempted to use variable \"") + expr.name.lexeme + "\" before it was defined.");
 		return nullptr;
 	}
+	this->symbol_visit_expr_variable(expr, info);
 	if (this->types.count(info->type().underlying()))
 	{
 		TypeName* type = new TypeName(info->type());
@@ -884,7 +883,14 @@ void* TypeChecker::visitStmtVariable(Stmt::Variable& stmt)
 		this->error(stmt.name, std::string("Attempted to declare variable ") + stmt.name.lexeme + " as void.");
 		return nullptr;
 	}
-	bool success = this->env->define_variable(TypeID(stmt.type), stmt.name.lexeme);
+	bool success = this->env->define_variable(TypeID(stmt.type), stmt.name.lexeme, SymbolUseNode(stmt.downcast()));
+	if (success)
+	{
+		if (const Variable* info = this->env->get_variable(stmt.name.lexeme))
+		{
+			this->symbol_visit_stmt_variable(stmt, info);
+		}
+	}
 	if (!stmt.initalizer)
 	{
 		this->error(stmt.name, std::string("Variable ") + stmt.name.lexeme + " is uninitalized.");
@@ -1051,7 +1057,7 @@ void* TypeChecker::visitStmtFunction(Stmt::Function& expr)
 			args
 		);
 
-		bool success = this->env->define_variable(function_type_id, expr.name.lexeme);
+		bool success = this->env->define_variable(function_type_id, expr.name.lexeme, expr.downcast());
 		this->types.emplace(function_type, function_type_id);
 		if (!success)
 		{
@@ -1075,7 +1081,7 @@ void* TypeChecker::visitStmtFunction(Stmt::Function& expr)
 		}
 		else
 		{
-			this->env->define_variable(TypeID(param_type), param_name.lexeme);
+			this->env->define_variable(TypeID(param_type), param_name.lexeme, expr.downcast());
 		}
 	}
 	if (!this->types.count(expr.return_type.underlying()))
