@@ -59,7 +59,7 @@ struct FunctionParam
 enum class FunctionSource
 {
 	User,
-	Builtin,
+	Native,
 };
 
 struct FunctionTypeID

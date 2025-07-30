@@ -1,7 +1,7 @@
 #include "NativeFunction.h"
 
 NativeFunction::NativeFunction(const std::string& name, TypeName return_type, std::vector<Stmt::Function::Param> params)
-	:definition(Token(0, TokenType::IDENTIFIER, name, name.c_str()), return_type, std::move(params), std::move(std::vector<std::unique_ptr<Stmt>>{}), FunctionSource::Builtin)
+	:definition(Token(0, TokenType::IDENTIFIER, name, name.c_str()), return_type, std::move(params), std::move(std::vector<std::unique_ptr<Stmt>>{}), FunctionSource::Native)
 {}
 
 NativeFunction::reference_type NativeFunction::make_reference(const std::string& name, TypeName return_type, std::vector<Stmt::Function::Param> params)
@@ -48,5 +48,5 @@ Token NativeFunction::token_literal_string(const std::string& val)
 
 Token NativeFunction::token_fake()
 {
-	return Token(0, TokenType::FUNCTION, "@builtin");
+	return Token(0, TokenType::FUNCTION, "@native");
 }

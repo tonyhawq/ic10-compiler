@@ -4,12 +4,12 @@
 #include "CodeGenerator.h"
 #include "Timer.h"
 
-const std::unordered_map<std::string, NativeFunction::reference_type>& Compiler::builtins()
+const std::unordered_map<std::string, NativeFunction::reference_type>& Compiler::native_functions()
 {
-	static std::unordered_map<std::string, NativeFunction::reference_type> _builtins = {
+	static std::unordered_map<std::string, NativeFunction::reference_type> _natives = {
 		{"load", (new NativeFunction("load", TypeName("number"), {{TypeName("number"), NativeFunction::token_literal_string("dummy")}}))->add_asm("l $&dummy d0 Setting").add_return("dummy").refit()}
 	};
-	return _builtins;
+	return _natives;
 }
 
 void Compiler::compile(const std::string& path)
@@ -33,9 +33,9 @@ void Compiler::compile(const std::string& path)
 	this->info("Parsing...");
 	Parser parser(*this, std::move(tokens));
 	std::vector<std::unique_ptr<Stmt>> program = parser.parse();
-	for (const auto& builtin : this->builtins())
+	for (const auto& native : this->native_functions())
 	{
-		program.push_back(builtin.second->splice());
+		program.push_back(native.second->splice());
 	}
 	this->info(std::string("Parsing took ") + std::to_string(timer.start() * 1000.0) + "ms.");
 	this->info("Typechecking...");
