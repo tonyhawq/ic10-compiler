@@ -888,7 +888,7 @@ void* CodeGenerator::visitExprCall(Expr::Call& expr)
 		const Variable* var = this->m_program.env().root()->get_variable(dynamic_cast<Expr::Variable*>(expr.callee.get())->name.lexeme);
 		if (!var)
 		{
-			throw std::runtime_error("Attempted to call a non-existent function.");
+			throw std::logic_error("Attempted to call a non-existent function.");
 		}
 		name = var->full_type().mangled_name();
 		this->comment("calling function");
@@ -896,7 +896,7 @@ void* CodeGenerator::visitExprCall(Expr::Call& expr)
 	}
 	else
 	{
-		throw std::runtime_error("Non-static functions not implemented yet.");
+		throw std::logic_error("Non-static functions not implemented yet.");
 	}
 
 	this->comment("Storing register values");
@@ -956,7 +956,7 @@ void* CodeGenerator::visitExprLogical(Expr::Logical& expr)
 		this->emit_raw("\n");
 		break;
 	default:
-		throw std::runtime_error("");
+		throw std::logic_error("");
 	}
 	return new RegisterOrLiteral(output);
 }
@@ -1105,12 +1105,12 @@ void* CodeGenerator::visitStmtAsm(Stmt::Asm& expr)
 {
 	if (!expr.literal->is<Expr::Literal>())
 	{
-		throw std::runtime_error("ASM statement was non-literal");
+		throw std::logic_error("ASM statement was non-literal");
 	}
 	Expr::Literal& str = *dynamic_cast<Expr::Literal*>(expr.literal.get());
 	if (!str.literal.literal.is_string())
 	{
-		throw std::runtime_error("ASM statement was non-string");
+		throw std::logic_error("ASM statement was non-string");
 	}
 	std::string raw = *str.literal.literal.string;
 	std::vector<size_t> registers_used = extract_unique_registers_from_str(raw);

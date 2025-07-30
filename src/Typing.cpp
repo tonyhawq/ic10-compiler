@@ -126,7 +126,7 @@ bool TypeName::operator!=(const TypeName& other) const
 	return !(*this == other);
 }
 
-#define CHECK_IS_FUNCTION_OR_ERROR(reason) do {if (!this->is_function) {throw std::runtime_error(std::string("TYPECHECK ERROR: !ATTEMPTED TO GET ") + std::string(reason) + " OF NON FUNCTION TYPE " + this->type.type_name());}} while(0)
+#define CHECK_IS_FUNCTION_OR_ERROR(reason) do {if (!this->is_function) {throw std::logic_error(std::string("TYPECHECK ERROR: !ATTEMPTED TO GET ") + std::string(reason) + " OF NON FUNCTION TYPE " + this->type.type_name());}} while(0)
 
 TypeName& TypeID::return_type()
 {

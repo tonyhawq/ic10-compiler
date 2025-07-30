@@ -72,7 +72,7 @@ void TypedEnvironment::reassign(size_t id, Leaf* new_node)
 {
 	if (!this->leaves.count(id))
 	{
-		throw std::runtime_error("No leaf exists.");
+		throw std::logic_error("No leaf exists.");
 	}
 	this->leaves[id] = new_node;
 }
@@ -295,7 +295,7 @@ TypeChecker::Operator::ReturnType TypeChecker::Operator::return_type(const std::
 	}
 	if (!return_type.failed())
 	{
-		throw std::runtime_error("TYPECHECKER ERROR: !NO OVERLOADS PROVIDED FOR OPERATOR!");
+		throw std::logic_error("TYPECHECKER ERROR: !NO OVERLOADS PROVIDED FOR OPERATOR!");
 	}
 	return return_type;
 }
@@ -390,7 +390,7 @@ TypedEnvironment::Leaf& TypeCheckedProgram::statement_environment(Stmt* statemen
 {
 	if (!statement)
 	{
-		throw std::runtime_error("Attempted to get env of nullptr statement.");
+		throw std::logic_error("Attempted to get env of nullptr statement.");
 	}
 	return *this->ptr_to_leaf.at(statement);
 }
@@ -457,7 +457,7 @@ void TypeChecker::define_operator(TokenType type, const std::string& name, std::
 {
 	if (this->operator_types.count(type))
 	{
-		throw std::runtime_error("TYPECHECK ERROR: !ATTEMPTED TO CREATE EXISTENT OPERATOR!");
+		throw std::logic_error("TYPECHECK ERROR: !ATTEMPTED TO CREATE EXISTENT OPERATOR!");
 	}
 	std::vector<std::unique_ptr<OperatorOverload>> fixed_overloads;
 	fixed_overloads.reserve(overloads.size());
@@ -986,7 +986,7 @@ void* TypeChecker::visitStmtReturn(Stmt::Return& expr)
 	const Variable* info = this->env->get_variable(function_name);
 	if (!info)
 	{
-		throw std::runtime_error("TYPECHECKER ERROR: !INSIDE NON-EXISTENT FUNCTION!");
+		throw std::logic_error("TYPECHECKER ERROR: !INSIDE NON-EXISTENT FUNCTION!");
 		return nullptr;
 	}
 	TypeID& function_type = this->types.at(info->type());
