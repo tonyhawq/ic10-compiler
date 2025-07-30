@@ -152,7 +152,6 @@ public:
 
 	TypeChecker(Compiler& compiler, std::vector<std::unique_ptr<Stmt>> statements);
 
-	void define_library_function(const std::string& name, const TypeName& return_type, const std::vector<TypeName>& params);
 	void define_operator(TokenType type, const std::string& name, std::vector<OwningPtr<OperatorOverload>> overloads);
 
 	TypeCheckedProgram check();
@@ -196,6 +195,8 @@ public:
 	static TypeName t_void;
 private:
 	bool seen_main = false;
+
+	Stmt* block_parent;
 
 	TypeCheckedProgram program;
 	TypedEnvironment::Leaf* env;

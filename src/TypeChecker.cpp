@@ -571,12 +571,39 @@ void* TypeChecker::visitExprUnary(Expr::Unary& expr)
 void TypeChecker::symbol_visit_expr_variable(Expr::Variable& expr, const Variable* info)
 {
 	SymbolTable::Index i = this->program.table.lookup_index(info->def().id());
-	this->program.table.alias_symbol(i, SymbolUseNode(expr.downcast(), UseLocation::During));
+	SymbolUseNode use = SymbolUseNode(expr.downcast(), UseLocation::During);
+	Symbol& sym = this->program.table.lookup(i);
+	this->program.table.alias_symbol(i, use);
+	if (this->block_parent && this->block_parent->is<Stmt::While>())
+	{
+		// TODO:
+		/*
+		number x = 0;
+		number y = 0;
+		while (y < 5)
+		{
+			y = y + 1;
+			x = 0;
+			while (x < 5)
+			{
+				x = x + y;
+			} <- detected last use of y
+		} when y's last use should be here
+		may cause register churn, but should be ?fine?
+		*/
+		sym.set_end(SymbolUseNode(this->block_parent, UseLocation::AfterStatement));
+	}
+	else
+	{
+		sym.set_end(use);
+	}
 }
 
 void TypeChecker::symbol_visit_stmt_variable(Stmt::Variable& stmt, const Variable* info)
 {
-	this->program.table.create_symbol(SymbolUseNode(stmt.downcast()));
+	SymbolTable::Index i = this->program.table.create_symbol(info->def());
+	Symbol& sym = this->program.table.lookup(i);
+	sym.set_end(SymbolUseNode(stmt.downcast(), UseLocation::AfterStatement));
 }
 
 void* TypeChecker::visitExprVariable(Expr::Variable& expr)
@@ -883,7 +910,7 @@ void* TypeChecker::visitStmtVariable(Stmt::Variable& stmt)
 		this->error(stmt.name, std::string("Attempted to declare variable ") + stmt.name.lexeme + " as void.");
 		return nullptr;
 	}
-	bool success = this->env->define_variable(TypeID(stmt.type), stmt.name.lexeme, SymbolUseNode(stmt.downcast()));
+	bool success = this->env->define_variable(TypeID(stmt.type), stmt.name.lexeme, SymbolUseNode(stmt.downcast(), UseLocation::During));
 	if (success)
 	{
 		if (const Variable* info = this->env->get_variable(stmt.name.lexeme))
@@ -921,7 +948,9 @@ void* TypeChecker::visitStmtBlock(Stmt::Block& stmt)
 		return nullptr;
 	}
 	this->env = this->env->spawn(&stmt);
+	Stmt* last_parent = this->block_parent;
 	this->evaluate(stmt.statements);
+	this->block_parent = last_parent;
 	this->env = this->env->get_parent();
 	return nullptr;
 }
@@ -942,6 +971,7 @@ void* TypeChecker::visitStmtWhile(Stmt::While& expr)
 	{
 		this->error(expr.token, "Attempted to loop on a non-boolean condition.");
 	}
+	this->block_parent = expr.downcast();
 	expr.body->accept(*this);
 	return nullptr;
 }
@@ -955,9 +985,11 @@ void* TypeChecker::visitStmtIf(Stmt::If& stmt)
 	std::unique_ptr<TypeName> condition_type = this->accept(*stmt.condition);
 	if (!condition_type)
 	{
+		this->block_parent = stmt.downcast();
 		stmt.branch_true->accept(*this);
 		if (stmt.branch_false)
 		{
+			this->block_parent = stmt.downcast();
 			stmt.branch_false->accept(*this);
 		}
 		return nullptr;
@@ -968,9 +1000,11 @@ void* TypeChecker::visitStmtIf(Stmt::If& stmt)
 		this->error(stmt.token, "Attempted to branch on a non-boolean condition.");
 		had_error = true;
 	}
+	this->block_parent = stmt.downcast();
 	stmt.branch_true->accept(*this);
 	if (stmt.branch_false)
 	{
+		this->block_parent = stmt.downcast();
 		stmt.branch_false->accept(*this);
 	}
 	if (had_error)
@@ -1059,7 +1093,7 @@ void* TypeChecker::visitStmtFunction(Stmt::Function& expr)
 
 		function_type_id.function_type->source = expr.source;
 
-		bool success = this->env->define_variable(function_type_id, expr.name.lexeme, expr.downcast());
+		bool success = this->env->define_variable(function_type_id, expr.name.lexeme, SymbolUseNode(expr.downcast(), UseLocation::During));
 		this->types.emplace(function_type, function_type_id);
 		if (!success)
 		{
@@ -1083,7 +1117,7 @@ void* TypeChecker::visitStmtFunction(Stmt::Function& expr)
 		}
 		else
 		{
-			this->env->define_variable(TypeID(param_type), param_name.lexeme, expr.downcast());
+			this->env->define_variable(TypeID(param_type), param_name.lexeme, SymbolUseNode(expr.downcast(), UseLocation::During));
 		}
 	}
 	if (!this->types.count(expr.return_type.underlying()))

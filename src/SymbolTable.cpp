@@ -6,16 +6,16 @@ SymbolUseNode::SymbolUseNode(std::shared_ptr<Expr>& expression, UseLocation loca
 	: expression(expression.get()), statement(nullptr), location(location)
 {}
 
-SymbolUseNode::SymbolUseNode(std::unique_ptr<Stmt>& statement)
-	: expression(nullptr), statement(statement.get()), location(UseLocation::During)
+SymbolUseNode::SymbolUseNode(std::unique_ptr<Stmt>& statement, UseLocation location)
+	: expression(nullptr), statement(statement.get()), location(location)
 {}
 
 SymbolUseNode::SymbolUseNode(Expr* expression, UseLocation location)
 	: expression(expression), statement(nullptr), location(location)
 {}
 
-SymbolUseNode::SymbolUseNode(Stmt* statement)
-	: expression(nullptr), statement(statement), location(UseLocation::During)
+SymbolUseNode::SymbolUseNode(Stmt* statement, UseLocation location)
+	: expression(nullptr), statement(statement), location(location)
 {}
 
 bool SymbolUseNode::is_expression() const
@@ -146,12 +146,7 @@ SymbolTable::Index SymbolTable::lookup_index(const std::shared_ptr<Expr>& ast_no
 
 Symbol& SymbolTable::lookup(const void* ast_node)
 {
-	Index i = this->lookup_index(ast_node);
-	if (i == this->Invalid)
-	{
-		throw std::logic_error("Attempted to get a non-existent symbol from an AST node");
-	}
-	return this->symbols[i];
+	return this->lookup(this->lookup_index(ast_node));
 }
 
 Symbol& SymbolTable::lookup(const std::unique_ptr<Stmt>& ast_node)
@@ -162,4 +157,13 @@ Symbol& SymbolTable::lookup(const std::unique_ptr<Stmt>& ast_node)
 Symbol& SymbolTable::lookup(const std::shared_ptr<Expr>& ast_node)
 {
 	return this->lookup((const void*)ast_node.get());
+}
+
+Symbol& SymbolTable::lookup(SymbolTable::Index index)
+{
+	if (index == this->Invalid)
+	{
+		throw std::logic_error("Attempted to get a non-existent symbol from an AST node");
+	}
+	return this->symbols[index];
 }
