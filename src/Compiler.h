@@ -7,7 +7,7 @@
 #include "Scanner.h"
 #include "Parser.h"
 #include "Optimizer.h"
-#include "builtins/Builtin.h"
+#include "native/NativeFunction.h"
 
 class Compiler : public Expr::Visitor, public Stmt::Visitor
 {
