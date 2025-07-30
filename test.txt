@@ -1,27 +1,8 @@
-static fixed number device = -1; # offset 3 -> -4 # push 0 peek 1
-static number x = 42;            # offset 2 -> -3 # push 1 peek 2
-static number y = 69;            # offset 1 -> -2 # push 2 peek 3
-static number z = -42;           # offset 0 -> -1 # push 3 peek 4
-
 function main() -> void
 {
-	fixed number fn = 42;
-	x = x + 1;
-	dset device "Setting" fn;
-
-	number afterset = dload device "Setting" -> number;
-	
-	if (afterset != x)
-	{
-		dset device "Setting" 62;
-	}
+	number afterset = 0;
 	load(afterset);
 	asm "l $&afterset d0 Setting
 s $afterset d0 Setting";
-
-	asm "yield";
-	asm "yield";
-	asm "yield";
-	asm "yield";
 	return;
 }

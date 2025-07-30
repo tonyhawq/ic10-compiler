@@ -79,6 +79,7 @@ public:
 	RegisterOrLiteral(const Literal& literal);
 	RegisterOrLiteral(const RegisterOrLiteral& other) = delete;
 	RegisterOrLiteral(RegisterOrLiteral&& other) noexcept;
+	~RegisterOrLiteral();
 
 	bool is_register() const;
 	bool is_literal() const;

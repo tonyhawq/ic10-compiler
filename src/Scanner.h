@@ -17,7 +17,7 @@ public:
 	void scan_token();
 	char advance();
 	Token& add_token(TokenType type);
-	Token& add_token(TokenType type, const char* literal);
+	Token& add_token(TokenType type, const std::string& literal);
 	Token& add_token(TokenType type, double literal);
 	Token& add_token(TokenType type, bool literal);
 	void scan_hashed_string();

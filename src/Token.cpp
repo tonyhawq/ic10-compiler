@@ -4,38 +4,22 @@ Literal::Literal()
 	:number(nullptr), string(nullptr), boolean(nullptr), string_hashed(false)
 {}
 
-Literal::Literal(const char* string)
+Literal::Literal(const std::string& string)
 	:Literal()
 {
-	this->string = new std::string(string);
+	this->string = std::make_unique<std::string>(string);
 }
 
 Literal::Literal(double number)
 	:Literal()
 {
-	this->number = new double(number);
+	this->number = std::make_unique<double>(number);
 }
 
 Literal::Literal(bool boolean)
 	:Literal()
 {
-	this->boolean = new bool(boolean);
-}
-
-Literal::~Literal()
-{
-	if (this->number)
-	{
-		delete this->number;
-	}
-	if (this->string)
-	{
-		delete this->string;
-	}
-	if (this->boolean)
-	{
-		delete this->boolean;
-	}
+	this->boolean = std::make_unique<bool>(boolean);
 }
 
 Literal::Literal(const Literal& other)
@@ -43,24 +27,22 @@ Literal::Literal(const Literal& other)
 {
 	if (other.number)
 	{
-		this->number = new double(*other.number);
+		this->number = std::make_unique<double>(*other.number);
 	}
 	if (other.string)
 	{
-		this->string = new std::string(*other.string);
+		this->string = std::make_unique<std::string>(*other.string);
 	}
 	if (other.boolean)
 	{
-		this->boolean = new bool(*other.boolean);
+		this->boolean = std::make_unique<bool>(*other.boolean);
 	}
 }
 
 Literal::Literal(Literal&& other) noexcept
-	:number(other.number), string(other.string), boolean(other.boolean), string_hashed(other.string_hashed)
+	:number(std::move(other.number)), string(std::move(other.string)), boolean(std::move(other.boolean)), string_hashed(other.string_hashed)
 {
-	other.number = nullptr;
-	other.string = nullptr;
-	other.boolean = nullptr;
+	other.string_hashed = false;
 }
 
 Literal& Literal::operator=(const Literal& other)
@@ -69,32 +51,20 @@ Literal& Literal::operator=(const Literal& other)
 	{
 		return *this;
 	}
-	if (this->number)
-	{
-		delete this->number;
-		this->number = nullptr;
-	}
-	if (this->string)
-	{
-		delete this->string;
-		this->string = nullptr;
-	}
-	if (this->boolean)
-	{
-		delete this->boolean;
-		this->boolean = nullptr;
-	}
+	this->number.reset();
 	if (other.number)
 	{
-		this->number = new double(*other.number);
+		this->number = std::make_unique<double>(*other.number);
 	}
+	this->string.reset();
 	if (other.string)
 	{
-		this->string = new std::string(*other.string);
+		this->string = std::make_unique<std::string>(*other.string);
 	}
+	this->boolean.reset();
 	if (other.boolean)
 	{
-		this->boolean = new bool(*other.boolean);
+		this->boolean = std::make_unique<bool>(*other.boolean);
 	}
 	this->string_hashed = other.string_hashed;
 	return *this;
@@ -106,36 +76,12 @@ Literal& Literal::operator=(Literal&& other) noexcept
 	{
 		return *this;
 	}
-	if (this->number)
-	{
-		delete this->number;
-		this->number = nullptr;
-	}
-	if (this->string)
-	{
-		delete this->string;
-		this->string = nullptr;
-	}
-	if (this->boolean)
-	{
-		delete this->boolean;
-		this->boolean = nullptr;
-	}
-	if (other.number)
-	{
-		this->number = other.number;
-		other.number = nullptr;
-	}
-	if (other.string)
-	{
-		this->string = other.string;
-		other.string = nullptr;
-	}
-	if (other.boolean)
-	{
-		this->boolean = other.boolean;
-		other.boolean = nullptr;
-	}
+	this->number.reset();
+	this->string.reset();
+	this->boolean.reset();
+	this->number = std::move(other.number);
+	this->string = std::move(other.string);
+	this->boolean = std::move(other.boolean);
 	this->string_hashed = other.string_hashed;
 	other.string_hashed = false;
 	return *this;
@@ -181,7 +127,7 @@ std::string Literal::to_value_string() const
 
 bool Literal::is_number() const
 {
-	return this->number;
+	return this->number.get();
 }
 
 bool Literal::is_string() const
@@ -196,7 +142,7 @@ bool Literal::is_hashstring() const
 
 bool Literal::is_boolean() const
 {
-	return this->boolean;
+	return this->boolean.get();
 }
 
 bool Literal::is_integral() const
@@ -303,25 +249,18 @@ Token::Token(int line, TokenType type, const std::string& lexeme)
 	:line(line), type(type), lexeme(lexeme), literal()
 {}
 Token::Token(int line, TokenType type, const std::string& lexeme, double literal)
-	:line(line), type(type), lexeme(lexeme), literal()
+	:line(line), type(type), lexeme(lexeme), literal(literal)
 {
-	this->literal.number = new double(literal);
 }
 
 Token::Token(int line, TokenType type, const std::string& lexeme, bool literal)
-	:line(line), type(type), lexeme(lexeme), literal()
+	:line(line), type(type), lexeme(lexeme), literal(literal)
 {
-	this->literal.boolean = new bool(literal);
 }
 
-Token::Token(int line, TokenType type, const std::string& lexeme, const char* literal)
-	:line(line), type(type), lexeme(lexeme), literal()
+Token::Token(int line, TokenType type, const std::string& lexeme, const std::string& literal)
+	:line(line), type(type), lexeme(lexeme), literal(literal)
 {
-	if (!literal)
-	{
-		return;
-	}
-	this->literal.string = new std::string(literal);
 }
 
 Token::Token(int line, TokenType type, const std::string& lexeme, const Literal& literal)
@@ -333,7 +272,7 @@ Token::Token(const Token& other)
 {}
 
 Token::Token(Token&& other) noexcept
-	:line(other.line), literal(other.literal), type(other.type), lexeme(other.lexeme)
+	:line(other.line), literal(std::move(other.literal)), type(other.type), lexeme(std::move(other.lexeme))
 {}
 
 Token::~Token()

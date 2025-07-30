@@ -43,7 +43,7 @@ std::unique_ptr<Stmt> Builtin::splice()
 
 Token Builtin::token_literal_string(const std::string& val)
 {
-	return Token(0, TokenType::STRING, val, val.data());
+	return Token(0, TokenType::STRING, val, val);
 }
 
 Token Builtin::token_fake()

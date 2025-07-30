@@ -2,6 +2,7 @@
 
 #include <string>
 #include <stdexcept>
+#include <memory>
 
 enum class TokenType
 {
@@ -63,10 +64,9 @@ enum class TokenType
 struct Literal
 {
 	Literal();
-	Literal(const char* string);
+	Literal(const std::string& string);
 	Literal(double number);
 	Literal(bool boolean);
-	~Literal();
 	Literal(const Literal& other);
 	Literal(Literal&& other) noexcept;
 
@@ -91,10 +91,10 @@ struct Literal
 	std::string to_lexeme() const;
 	TokenType type() const;
 
-	double* number;
+	std::unique_ptr<double> number;
+	std::unique_ptr<std::string> string;
+	std::unique_ptr<bool> boolean;
 	bool string_hashed;
-	std::string* string;
-	bool* boolean;
 };
 
 class Token
@@ -104,7 +104,7 @@ public:
 	Token(int line, TokenType type, const std::string& lexeme, const Literal& literal);
 	Token(int line, TokenType type, const std::string& lexeme, bool literal);
 	Token(int line, TokenType type, const std::string& lexeme, double literal);
-	Token(int line, TokenType type, const std::string& lexeme, const char* literal);
+	Token(int line, TokenType type, const std::string& lexeme, const std::string& literal);
 	Token(const Token& other);
 	Token(Token&& other) noexcept;
 	~Token();

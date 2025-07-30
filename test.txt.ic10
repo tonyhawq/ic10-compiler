@@ -1,41 +1,26 @@
-push 42
-push 69
-push -42
-jal 8
+jal 5
 sub sp sp 1
 jr -2
 #Function definition for
 #main_return_void_params_
 push ra
-move r1 sp
-move sp 1
+push 0
+#calling function
+#load
+#Storing register values
+#Stored.
 peek r0
-move sp r1
-add r0 r0 1
-move r1 sp 
-move sp 0
 push r0
-move sp r1
-s db Setting 42
-l r0 db Setting
-push r0
-peek r0
-move r2 sp
-move sp 1
-peek r1
-move sp r2
-sne r0 r0 r1
-breqz r0 2
-s db Setting 62
+jal 33
+#Getting return value
+pop r0
+#Restoring register values
+#Restored.
 peek r0
 l r0 d0 Setting
 s r0 d0 Setting
 sub sp sp 1
 push r0
-yield
-yield
-yield
-yield
 #return statement for 
 #main_return_void_params_
 sub sp sp 1

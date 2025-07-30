@@ -247,7 +247,10 @@ RegisterOrLiteral::RegisterOrLiteral(const Literal& literal)
 
 RegisterOrLiteral::RegisterOrLiteral(RegisterOrLiteral&& other) noexcept
 	:m_literal(std::move(other.m_literal)), m_reg(std::move(other.m_reg))
-{}
+{
+	other.m_literal = nullptr;
+	other.m_reg = nullptr;
+}
 
 bool RegisterOrLiteral::is_register() const
 {
@@ -299,14 +302,18 @@ std::string RegisterOrLiteral::to_string() const
 {
 	if (this->is_literal())
 	{
-		Literal literal = *this->m_literal;
-		return literal.to_value_string();
+		return this->get_literal().to_value_string();
 	}
 	if (this->is_register())
 	{
 		return this->m_reg->to_string();
 	}
 	throw std::runtime_error("Attempted to call ::to_string on an invalid RegisterOrLiteral.");
+}
+
+RegisterOrLiteral::~RegisterOrLiteral()
+{
+
 }
 
 RegisterAllocator::RegisterAllocator(size_t register_count)
@@ -918,7 +925,7 @@ void* CodeGenerator::visitExprCall(Expr::Call& expr)
 	this->restore_register_values();
 	this->comment("Restored.");
 	
-	return return_value.release();
+	return new RegisterOrLiteral(return_value);
 }
 
 void* CodeGenerator::visitExprLogical(Expr::Logical& expr)
@@ -1101,7 +1108,7 @@ void* CodeGenerator::visitStmtAsm(Stmt::Asm& expr)
 		throw std::runtime_error("ASM statement was non-literal");
 	}
 	Expr::Literal& str = *dynamic_cast<Expr::Literal*>(expr.literal.get());
-	if (!str.literal.literal.string)
+	if (!str.literal.literal.is_string())
 	{
 		throw std::runtime_error("ASM statement was non-string");
 	}

@@ -357,9 +357,9 @@ std::unique_ptr<Stmt> Parser::parse_asm_statement()
 	{
 		this->error(this->peek(), "Expected string literal following asm.");
 	}
-	if (!dynamic_cast<Expr::Literal&>(*expression).literal.literal.string)
+	if (!expression->as<Expr::Literal>().literal.literal.string)
 	{	
-		this->error(this->peek(), "Expected string literal following asm.");
+		this->error(this->peek(), std::string("Expected string literal following asm, got ") + expression->as<Expr::Literal>().literal.to_string());
 	}
 	this->consume(TokenType::SEMICOLON, "Expected semicolon after asm literal.");
 	return std::make_unique<Stmt::Asm>(expression, token);

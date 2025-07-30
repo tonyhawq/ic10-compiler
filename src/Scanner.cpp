@@ -61,7 +61,8 @@ char Scanner::advance()
 
 Token& Scanner::add_token(TokenType type)
 {
-	return this->add_token(type, nullptr);
+	this->tokens.emplace_back(this->current_line, type, this->source.substr(this->token_start, this->current_character - this->token_start), Literal());
+	return this->tokens.at(this->tokens.size() - 1);
 }
 
 Token& Scanner::add_token(TokenType type, double literal)
@@ -70,7 +71,7 @@ Token& Scanner::add_token(TokenType type, double literal)
 	return this->tokens.at(this->tokens.size() - 1);
 }
 
-Token& Scanner::add_token(TokenType type, const char* literal)
+Token& Scanner::add_token(TokenType type, const std::string& literal)
 {
 	this->tokens.emplace_back(this->current_line, type, this->source.substr(this->token_start, this->current_character - this->token_start), literal);
 	return this->tokens.at(this->tokens.size() - 1);
@@ -133,7 +134,7 @@ void Scanner::scan_hashed_string()
 	}
 	this->advance();
 	std::string substr = this->source.substr(this->token_start, this->current_character - this->token_start);
-	this->add_token(TokenType::HASHED_STRING, substr.c_str()).literal.string_hashed = true;
+	this->add_token(TokenType::HASHED_STRING, substr).literal.string_hashed = true;
 }
 
 bool Scanner::is_digit(char character)
@@ -169,7 +170,7 @@ void Scanner::scan_string()
 	}
 	this->advance();
 	std::string substr = this->source.substr(this->token_start + 1, this->current_character - this->token_start - 2);
-	this->add_token(TokenType::STRING, substr.c_str());
+	this->add_token(TokenType::STRING, substr);
 }
 
 void Scanner::scan_number()
