@@ -11,6 +11,8 @@
 struct Expr;
 struct Stmt;
 
+class Variable;
+
 enum class UseLocation
 {
 	During,
@@ -45,15 +47,16 @@ private:
 class Symbol
 {
 public:
-	explicit Symbol();
-	explicit Symbol(SymbolUseNode initalizer);
+	explicit Symbol(const Variable* var);
+	explicit Symbol(SymbolUseNode initalizer, const Variable* var);
 
 	SymbolUseNode beginning();
 	SymbolUseNode ending();
+	const Variable& var() const;
 
 	void set_end(SymbolUseNode end);
-	TypeID type;
 private:
+	const Variable* m_var;
 	std::optional<SymbolUseNode> begin;
 	std::optional<SymbolUseNode> end;
 };
@@ -66,7 +69,7 @@ public:
 
 	SymbolTable();
 	
-	Index create_symbol(SymbolUseNode inital);
+	Index create_symbol(SymbolUseNode inital, const Variable* var);
 	void alias_symbol(Index symbol, SymbolUseNode alias);
 	Index lookup_index(const void* ast_node);
 	Index lookup_index(const std::unique_ptr<Stmt>& ast_node);

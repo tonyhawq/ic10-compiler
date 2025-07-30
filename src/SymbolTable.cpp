@@ -82,14 +82,19 @@ UseLocation SymbolUseNode::loc() const
 	return this->location;
 }
 
-Symbol::Symbol()
-	: begin(), end(), type(UNDEFINED_TYPE)
+Symbol::Symbol(const Variable* var)
+	: begin(), end(), m_var(var)
 {}
 
-Symbol::Symbol(SymbolUseNode initalizer)
-	: begin(initalizer), end(), type(UNDEFINED_TYPE)
+Symbol::Symbol(SymbolUseNode initalizer, const Variable* var)
+	: begin(initalizer), end(), m_var(var)
 {
 
+}
+
+const Variable& Symbol::var() const
+{
+	return *this->m_var;
 }
 
 SymbolUseNode Symbol::beginning()
@@ -111,9 +116,9 @@ SymbolTable::SymbolTable()
 {
 }
 
-SymbolTable::Index SymbolTable::create_symbol(SymbolUseNode inital)
+SymbolTable::Index SymbolTable::create_symbol(SymbolUseNode inital, const Variable* var)
 {
-	this->symbols.push_back(Symbol(inital));
+	this->symbols.push_back(Symbol(inital, var));
 	Index i = this->symbols.size() - 1;
 	this->name_to_symbol.emplace(inital.id(), i);
 	return i;

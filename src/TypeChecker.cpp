@@ -21,8 +21,8 @@ std::string Identifier::name() const
 	return this->m_name;
 }
 
-Variable::Variable(const Identifier& identifier, const TypeID& type, const SymbolUseNode& node)
-	:m_identifier(identifier), m_type(type), m_definition(node)
+Variable::Variable(const Identifier& identifier, const TypeID& type, const SymbolUseNode& node, const TypedEnvironment::Leaf& enclosing)
+	:m_identifier(identifier), m_type(type), m_definition(node), m_enclosing_environment(enclosing)
 {}
 
 SymbolUseNode Variable::def() const
@@ -53,6 +53,11 @@ const TypeID& Variable::full_type() const
 const Identifier& Variable::identifier() const
 {
 	return this->m_identifier;
+}
+
+const TypedEnvironment::Leaf& Variable::enclosing() const
+{
+	return this->m_enclosing_environment;
 }
 
 TypedEnvironment::TypedEnvironment()
@@ -167,7 +172,7 @@ bool TypedEnvironment::Leaf::define_variable(const TypeID& type, const Identifie
 	{
 		return false;
 	}
-	this->m_variables.emplace(identifier, Variable(identifier, type, def));
+	this->m_variables.emplace(identifier, Variable(identifier, type, def, *this));
 	return true;
 }
 
@@ -601,7 +606,7 @@ void TypeChecker::symbol_visit_expr_variable(Expr::Variable& expr, const Variabl
 
 void TypeChecker::symbol_visit_stmt_variable(Stmt::Variable& stmt, const Variable* info)
 {
-	SymbolTable::Index i = this->program.table.create_symbol(info->def());
+	SymbolTable::Index i = this->program.table.create_symbol(info->def(), info);
 	Symbol& sym = this->program.table.lookup(i);
 	sym.set_end(SymbolUseNode(stmt.downcast(), UseLocation::AfterStatement));
 }
@@ -1118,6 +1123,10 @@ void* TypeChecker::visitStmtFunction(Stmt::Function& expr)
 		else
 		{
 			this->env->define_variable(TypeID(param_type), param_name.lexeme, SymbolUseNode(expr.downcast(), UseLocation::During));
+			const Variable* var = this->env->get_variable(param_name.lexeme);
+			SymbolTable::Index i = this->program.table.create_symbol(var->def(), var);
+			Symbol& sym = this->program.table.lookup(i);
+			sym.set_end(var->def());
 		}
 	}
 	if (!this->types.count(expr.return_type.underlying()))

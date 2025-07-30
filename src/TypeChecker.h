@@ -32,24 +32,6 @@ namespace std {
 	};
 }
 
-class Variable
-{
-public:
-	Variable(const Identifier& identifier, const TypeID& type, const SymbolUseNode& node);
-
-	TypeName& type();
-	TypeID& full_type();
-
-	SymbolUseNode def() const;
-	const TypeName& type() const;
-	const TypeID& full_type() const;
-	const Identifier& identifier() const;
-private:
-	SymbolUseNode m_definition;
-	Identifier m_identifier;
-	TypeID m_type;
-};
-
 class TypedEnvironment
 {
 public:
@@ -67,6 +49,26 @@ private:
 	std::unordered_map<size_t, Leaf*> leaves;
 	size_t next_id;
 	std::unique_ptr<Leaf> m_root;
+};
+
+class Variable
+{
+public:
+	Variable(const Identifier& identifier, const TypeID& type, const SymbolUseNode& node, const TypedEnvironment::Leaf& enclosing);
+
+	TypeName& type();
+	TypeID& full_type();
+
+	SymbolUseNode def() const;
+	const TypeName& type() const;
+	const TypeID& full_type() const;
+	const Identifier& identifier() const;
+	const TypedEnvironment::Leaf& enclosing() const;
+private:
+	const TypedEnvironment::Leaf& m_enclosing_environment;
+	SymbolUseNode m_definition;
+	Identifier m_identifier;
+	TypeID m_type;
 };
 
 class TypedEnvironment::Leaf
