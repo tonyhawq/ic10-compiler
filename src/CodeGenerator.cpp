@@ -98,7 +98,7 @@ void StackEnvironment::forget(const std::string& name)
 			return;
 		}
 	}
-	throw std::runtime_error(std::string("Attempted to forget a non-existent variable: ") + name);
+	throw std::logic_error(std::string("Attempted to forget a non-existent variable: ") + name);
 }
 
 StackVariable& StackEnvironment::define(const std::string& name, int size)
@@ -148,7 +148,7 @@ StackEnvironment* StackEnvironment::spawn_in_function(const std::string& name)
 {
 	if (this->child)
 	{
-		throw std::runtime_error("Attempted to spawn while having a child.");
+		throw std::logic_error("Attempted to spawn while having a child.");
 	}
 	StackEnvironment* child = new StackEnvironment(this);
 	this->child = child;
@@ -160,7 +160,7 @@ StackEnvironment* StackEnvironment::pop()
 {
 	if (!this->parent)
 	{
-		throw std::runtime_error("Cannot pop top-level environment");
+		throw std::logic_error("Cannot pop top-level environment");
 	}
 	StackEnvironment* parent = this->parent;
 	delete parent->child;
@@ -171,7 +171,7 @@ StackEnvironment* StackEnvironment::pop_to_function()
 {
 	if (!parent)
 	{
-		throw std::runtime_error("Cannot pop top-level environment");
+		throw std::logic_error("Cannot pop top-level environment");
 	}
 	StackEnvironment* parent = this;
 	while (!parent->m_function_name)
@@ -179,7 +179,7 @@ StackEnvironment* StackEnvironment::pop_to_function()
 		parent = parent->parent;
 		if (!parent)
 		{
-			throw std::runtime_error("Attempted to call StackEnvironment::pop_to_function() from an environment that is not inside a function.");
+			throw std::logic_error("Attempted to call StackEnvironment::pop_to_function() from an environment that is not inside a function.");
 		}
 	}
 	if (parent->child)
@@ -266,7 +266,7 @@ Register& RegisterOrLiteral::get_register()
 {
 	if (!this->is_register())
 	{
-		throw std::runtime_error("Attempted to get register while this was not a register.");
+		throw std::logic_error("Attempted to get register while this was not a register.");
 	}
 	return *this->m_reg;
 }
@@ -275,7 +275,7 @@ Literal& RegisterOrLiteral::get_literal()
 {
 	if (!this->is_literal())
 	{
-		throw std::runtime_error("Attempted to get literal while this was not a literal.");
+		throw std::logic_error("Attempted to get literal while this was not a literal.");
 	}
 	return *this->m_literal;
 }
@@ -284,7 +284,7 @@ const Register& RegisterOrLiteral::get_register() const
 {
 	if (!this->is_register())
 	{
-		throw std::runtime_error("Attempted to get register while this was not a register.");
+		throw std::logic_error("Attempted to get register while this was not a register.");
 	}
 	return *this->m_reg;
 }
@@ -293,7 +293,7 @@ const Literal& RegisterOrLiteral::get_literal() const
 {
 	if (!this->is_literal())
 	{
-		throw std::runtime_error("Attempted to get literal while this was not a literal.");
+		throw std::logic_error("Attempted to get literal while this was not a literal.");
 	}
 	return *this->m_literal;
 }
@@ -308,7 +308,7 @@ std::string RegisterOrLiteral::to_string() const
 	{
 		return this->m_reg->to_string();
 	}
-	throw std::runtime_error("Attempted to call ::to_string on an invalid RegisterOrLiteral.");
+	throw std::logic_error("Attempted to call ::to_string on an invalid RegisterOrLiteral.");
 }
 
 RegisterOrLiteral::~RegisterOrLiteral()
