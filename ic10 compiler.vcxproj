@@ -104,6 +104,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -118,6 +119,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -140,6 +142,8 @@
     <ClCompile Include="src\Timer.cpp" />
     <ClCompile Include="src\Token.cpp" />
     <ClCompile Include="src\TypeChecker.cpp" />
+    <ClCompile Include="src\SymbolTable.cpp" />
+    <ClCompile Include="src\Typing.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\builtins\Builtin.h" />
@@ -155,6 +159,8 @@
     <ClInclude Include="src\Timer.h" />
     <ClInclude Include="src\Token.h" />
     <ClInclude Include="src\TypeChecker.h" />
+    <ClInclude Include="src\SymbolTable.h" />
+    <ClInclude Include="src\Typing.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -869,9 +869,9 @@ void CodeGenerator::restore_register_values()
 	{
 		return;
 	}
-	for (int i = this->stored_registers.size() - 1; i >= 0; i--)
+	for (auto it = this->stored_registers.rbegin(); it != this->stored_registers.rend(); ++it)
 	{
-		const Register& reg = this->stored_registers[i];
+		const Register& reg = *it;
 		this->env->forget(std::string("@s_") + reg.to_string());
 		this->emit_raw("pop ");
 		this->emit_register_use(reg);

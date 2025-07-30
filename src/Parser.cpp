@@ -630,5 +630,5 @@ const Token& Parser::consume(TokenType type, const std::string& error_message)
 		return this->advance();
 	}
 	this->error(this->peek(), error_message);
-	return Token(0, TokenType::T_EOF, "Unreachable");
+	throw ParseError();
 }

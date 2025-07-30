@@ -7,47 +7,9 @@
 #include "OwningPtr.h"
 #include "AST.h"
 #include "Parser.h"
+#include "SymbolTable.h"
 
 class Compiler;
-
-struct TypeID;
-struct FunctionParam;
-
-struct FunctionTypeID
-{
-	FunctionTypeID(const TypeName& return_type, const std::string& mangled_name, const std::string& unmangled_name, const std::vector<FunctionParam> arguments);
-	TypeName return_type;
-	std::string mangled_name;
-	std::string unmangled_name;
-	std::vector<FunctionParam> arguments;
-};
-
-struct TypeID
-{
-	explicit TypeID(const TypeName& type);
-	TypeID(const TypeName& type, const TypeName& return_type, const std::string& m_unmangled_name, const std::vector<FunctionParam>& m_arguments);
-	explicit TypeID(const TypeID& other);
-
-	TypeName type;
-	TypeName& return_type();
-	std::string& mangled_name();
-	std::string& unmangled_name();
-	std::vector<FunctionParam>& arguments();
-	const TypeName& return_type() const;
-	const std::string& mangled_name() const;
-	const std::string& unmangled_name() const;
-	const std::vector<FunctionParam>& arguments() const;
-	Literal fixed_value;
-
-	bool is_function = false;
-	std::unique_ptr<FunctionTypeID> function_type;
-};
-
-struct FunctionParam
-{
-	TypeName type;
-	std::string name;
-};
 
 class Identifier
 {
@@ -158,6 +120,7 @@ public:
 	TypeCheckedProgram(std::vector<std::unique_ptr<Stmt>> statements);
 	void add_statement(std::unique_ptr<Stmt>& statement, TypedEnvironment::Leaf& containing_env);
 	
+	SymbolTable table;
 	const std::vector<std::unique_ptr<Stmt>>& statements() const;
 	std::vector<std::unique_ptr<Stmt>>& statements();
 	TypedEnvironment& env();
@@ -166,6 +129,11 @@ private:
 	std::unordered_map<Stmt*, TypedEnvironment::Leaf*> ptr_to_leaf;
 	TypedEnvironment m_env;
 	std::vector<std::unique_ptr<Stmt>> m_statements;
+};
+
+namespace types
+{
+	TypeName get_function_signature(const std::vector<Stmt::Function::Param>& params, const TypeName& return_type);
 };
 
 class TypeChecker : public Expr::Visitor, public Stmt::Visitor
@@ -194,10 +162,6 @@ public:
 	static bool can_assign(const TypeName& to, const TypeName& from);
 
 	std::unique_ptr<TypeName> accept(Expr& expression);
-
-	static std::string get_mangled_function_name(const std::string& name, const std::vector<FunctionParam> params, const TypeName& return_type);
-	static TypeName get_function_signature(const std::vector<FunctionParam>& params, const TypeName& return_type);
-	static TypeName get_function_signature(const std::vector<Stmt::Function::Param>& params, const TypeName& return_type);
 
 	virtual void* visitExprBinary(Expr::Binary& expr) override;
 	virtual void* visitExprGrouping(Expr::Grouping& expr) override;
